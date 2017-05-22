@@ -99,6 +99,10 @@ def filter_gutenberg(vocab):
                                  CorpusReader,
                                  r'(?!\.).*\.txt',
                                  encoding='latin1')
+    gb_vocab = set()
+    for sent in gutenberg.sents():
+        gb_vocab.update(list(map(str.lower, sent)))
+    vocab = gb_vocab.intersection(vocab)
     sents = []
     for sent in gutenberg.sents():
         for word in sent:
