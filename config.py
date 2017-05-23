@@ -28,7 +28,7 @@ file_paths_arg.add_argument('--log_dir', type=str, default='logs') #
 file_paths_arg.add_argument('--data_dir', type=str, default='data')
 
 hyper_params_arg = add_argument_group('hyper_params')
-hyper_params_arg.add_argument('--batch_size', type=int, default=48)
+hyper_params_arg.add_argument('--batch_size', type=int, default=64)
 hyper_params_arg.add_argument('--z_num', type=int, default=128, choices=[64, 128])
 
 hyper_params_arg.add_argument('--optimizer', type=str, default='adam')

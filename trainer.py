@@ -7,27 +7,26 @@ from collections import deque
 from utils import *
 import tensorflow as tf
 from models import *
+from data import TOK_PAD
 
 class Trainer(object):
-    def __init__(self, config, data, W_e_init):
+    def __init__(self, config, data, W_e_init, word2idx):
         #  self, W_e_init, max_sentence_len, num_classes, vocab_size,
         #  embedding_size, filter_sizes, num_filters, data_format, l2_reg_lambda=0.0
         #MAX_SENTENCE_LEN = 20
         #VOCAB_SIZE = 1000
         #EMBEDDING_SIZE = 300
         self.batch_size = config.batch_size
+        self.data = np.asarray(data)
         #self.data = np.random.randint(VOCAB_SIZE, size=(self.batch_size, MAX_SENTENCE_LEN))
+        self.W_e_init = np.asarray(W_e_init)
         #self.W_e_init = np.random.rand(VOCAB_SIZE, EMBEDDING_SIZE)
-        self.max_sentence_len = data.shape[1]
-        self.vocab_size = W_e_init.shape[0]
-        self.embedding_size = W_e_init.shape[1]
+        self.word2idx = word2idx
+        self.pad_idx = word2idx[TOK_PAD]
 
-        def convert_to_onehot(labels):
-            num_classes = np.max(labels)+1
-            return np.eye(num_classes)[labels]
-
-        self.y_real = convert_to_onehot(np.ones(self.batch_size, dtype=np.int))
-        self.y_fake = convert_to_onehot(np.zeros(self.batch_size, dtype=np.int))
+        self.max_sentence_len = self.data.shape[1]
+        self.vocab_size = self.W_e_init.shape[0]
+        self.embedding_size = self.W_e_init.shape[1]
 
         self.filter_sizes = [3,4,5]
         self.num_filters = 300
@@ -45,15 +44,12 @@ class Trainer(object):
         self.g_lr, self.d_lr = config.g_lr, config.d_lr
 
         self.global_step = tf.Variable(0, name="global_step", trainable=False)
-        self.start_step = 0
         self.log_step = config.log_step
         self.max_step = config.max_step
         self.save_step = config.save_step
         self.lr_update_step = config.lr_update_step
 
         self.is_train = config.is_train
-
-
 
         self.build_model()
 
@@ -128,7 +124,40 @@ class Trainer(object):
 
     def train(self):
 
-        for step in trange(self.start_step, self.max_step): # 0 - 500000
+        def get_batch(data, batch_size, max_step):
+            under = 0
+            max = len(data)
+            for step in trange(0, max_step):
+                upper = under + batch_size
+                if upper <= max:
+                    batch = data[under:upper]
+                else:
+                    rest = upper - max
+                    batch = np.concatenate(data[under:max], data[0:rest])
+                    under = rest
+                yield step, batch
+
+        def swap_random_words(batch, pad_idx):
+            for sent in batch:
+                len_seq = sent.tolist().index(pad_idx)
+                i,j = np.random.choice(len_seq, 2)
+                sent[i], sent[j] = sent[j], sent[i]
+            return batch
+
+        def convert_to_onehot(labels, num_classes):
+            return np.eye(num_classes)[labels]
+
+        for step, batch in get_batch(self.data, self.batch_size, self.max_step): # 0 - 500000
+
+            data_real = batch[0:int(self.batch_size/2)]
+            data_fake = swap_random_words(batch[int(self.batch_size/2):], self.pad_idx)
+
+            label_real = convert_to_onehot(np.ones(int(self.batch_size/2), dtype=np.int), 2)
+            label_fake = convert_to_onehot(np.zeros(int(self.batch_size/2), dtype=np.int), 2)
+
+
+            data = np.concatenate((data_real, data_fake))
+            label = np.concatenate((label_real, label_fake))
 
             fetch_dict = {
                 "d_train_op": self.d_train_op,
@@ -137,8 +166,8 @@ class Trainer(object):
                 "D_accuracy": self.D.accuracy
             }
             feed_dict = { # evaluate every step
-                self.D.input_x: self.data,
-                self.D.input_y: self.y_real,
+                self.D.input_x: data,
+                self.D.input_y: label,
                 self.D.dropout_keep_prob: self.dropout_keep_prob
             }
             if step % self.log_step == 0: # default : 50

@@ -6,7 +6,10 @@ import re
 
 from glove import load_glove_vocab, load_glove_embeddings
 from simple_questions import load_simple_questions
+import sys
 
+reload(sys)
+sys.setdefaultencoding('utf8')
 
 TOK_UNK = '-unk-'
 TOK_PAD = '-pad-'
