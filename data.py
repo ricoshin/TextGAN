@@ -3,7 +3,10 @@ import re
 
 from glove import load_glove_vocab, load_glove_embeddings
 from simple_questions import load_simple_questions
+import sys
 
+reload(sys)
+sys.setdefaultencoding('utf8')
 
 TOK_UNK = '-unk-'
 TOK_PAD = '-pad-'
@@ -78,7 +81,7 @@ def load_simple_questions_dataset():
     vocab = sq_vocab-unknowns
 
     print('Append pads')
-    max_question_len = max(len(sent) for sent in sents)
+    max_question_len = max(len(question) for question in questions)
     questions = append_pads(questions)
     vocab.update([TOK_UNK, TOK_PAD])
 
