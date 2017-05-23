@@ -6,5 +6,23 @@ Requirements
 ------------
 - Python 2.7
 - Tensorflow 1.1
+- NLTK
+- spaCy
+- parlAI
 - [Gutenberg](https://web.eecs.umich.edu/~lahiri/gutenberg_dataset.html)
 - [GloVe](https://nlp.stanford.edu/projects/glove/)
+
+Troubleshooting
+---------------
+- `ValueError: unknown local: UTF-8`
+
+```bash
+export LC_ALL=en_US.UTF-8
+export LANG=en_US.UTF-8
+```
+
+- `ValueError: Word vectors set to length 0. This may be because the data is not installed. If you haven't already, run python -m spacy download en to install the data.`
+
+```bash
+python -m spacy download en
+```
