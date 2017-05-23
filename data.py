@@ -88,7 +88,7 @@ def load_simple_questions_dataset():
     print('Convert to index')
     questions = convert_to_idx(questions, word2idx)
 
-    return questions, embd_mat
+    return questions, embd_mat, word2idx
 
 def get_batch(data, batch_size):
     for offset in range(0, len(data), batch_size):
