@@ -1,5 +1,8 @@
 import argparse
 
+def str2bool(v):
+    return v.lower() in ('true', '1')
+
 def add_argument_group(name):
     arg = parser.add_argument_group(name)
     arg_lists.append(arg)
@@ -27,7 +30,6 @@ file_paths_arg.add_argument('--data_dir', type=str, default='data')
 hyper_params_arg = add_argument_group('hyper_params')
 hyper_params_arg.add_argument('--batch_size', type=int, default=48)
 hyper_params_arg.add_argument('--z_num', type=int, default=128, choices=[64, 128])
-hyper_params_arg.add_argument('--filter_', type=int, default=128, choices=[64, 128])
 
 hyper_params_arg.add_argument('--optimizer', type=str, default='adam')
 hyper_params_arg.add_argument('--d_lr', type=float, default=0.00002) # learning rate of Discriminator
@@ -37,6 +39,16 @@ hyper_params_arg.add_argument('--max_step', type=int, default=500000)
 
 def get_config(): # when program get started, this function runs for the first.
     config, unparsed = parser.parse_known_args() # config is pre-defined object.
+    if config.use_gpu: # NCHW on GPU / NHWC on CPU
 
-        setattr(config, 'data_format', data_format) # set data_format attribute in config.
+        data_format = 'NCHW' # cuDNN default image data format
+                             # [batch_size, channels, height, width]
+                             # although cuDNN can operate on both formats,
+                             #  it's faster to operate in its default format.
+    else:
+        data_format = 'NHWC' # TensorFlow default image data format
+                             # [batch_size, height, width, channels]
+                             # NHWC is a little faster on CPU
+
+    setattr(config, 'data_format', data_format) # set data_format attribute in config.
     return config, unparsed # only config object is used later.
