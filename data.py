@@ -83,12 +83,12 @@ def load_simple_questions_dataset():
     vocab.update([TOK_UNK, TOK_PAD])
 
     print('Load GloVe embeddings')
-    word2embd, word2idx = load_glove_embeddings('data/glove', '42B', 300, vocab)
+    embd_mat, word2idx = load_glove_embeddings('data/glove', '42B', 300, vocab)
 
     print('Convert to index')
     questions = convert_to_idx(questions, word2idx)
 
-    return questions, vocab, word2idx, word2embd, max_question_len
+    return questions, embd_mat
 
 def get_batch(data, batch_size):
     for offset in range(0, len(data), batch_size):
