@@ -1,29 +1,13 @@
-from collections import Counter
-from glob import glob
-import os
+import copy
 import re
 
-import nltk
-from nltk.corpus import LazyCorpusLoader
-from nltk.corpus.reader import PlaintextCorpusReader
-from nltk.tokenize import PunktSentenceTokenizer, TreebankWordTokenizer
-import numpy as np
+from glove import load_glove_vocab, load_glove_embeddings
+from simple_questions import load_simple_questions
 
 
-class CorpusReader(PlaintextCorpusReader):
-    def __init__(self,
-                 root,
-                 fields,
-                 word_tokenizer=TreebankWordTokenizer(),
-                 sent_tokenizer=PunktSentenceTokenizer(),
-                 **kwargs):
-        known_abbrs = ['mr', 'mrs', 'dr', 'st']
-        sent_tokenizer._params.abbrev_types.update(known_abbrs)
-        super(CorpusReader, self).__init__(root,
-                                           fields,
-                                           word_tokenizer=word_tokenizer,
-                                           sent_tokenizer=sent_tokenizer,
-                                           **kwargs)
+TOK_UNK = '-unk-'
+TOK_PAD = '-pad-'
+
 def find_abbr_candidates(text):
     abbr_regex = re.compile('(\s\w+\s([A-Z][a-z]*\.([A-Za-z]\.)*)\s\w+)')
     known_abbrs = ['mr.', 'mrs.', 'dr.', 'st.']
@@ -38,83 +22,74 @@ def find_abbr_candidates(text):
         examples.append(cand[0])
     return cand_dict
 
-def load_gutenberg_dataset():
-    nltk.download('gutenberg')
-    gutenberg = LazyCorpusLoader('gutenberg',
-                                 CorpusReader,
-                                 r'(?!\.).*\.txt',
-                                 encoding='latin1')
-    sents = [[word.lower() for word in sent] for sent in gutenberg.sents()]
-    vocab = Counter()
-    for sent in sents:
-        vocab.update(sent)
-    return sents, vocab
-
-def load_glove_with_vocab(data_dir, size, vocab):
+def replace_unknowns(sents, unknowns):
     """
     Args:
-        data_dir: Path to pre-trained GloVe embeddings directory
-        size: Word embedding size: 50, 100, 200, or 300
+        sents: list(list(str))
+        unknowns: set(str)
     Returns:
-        Tuple of GloVe word embeddings matrix of shape [len(vocab), size] and
-        word to index dictionary
+        list(list(str))
     """
-    word2embd = dict()
-    fname = 'glove.6B.%dd.txt' % size
-    with open(os.path.join(data_dir, fname)) as f:
-        for line in f:
-            l = line.split()
-            word = l[0]
-            if word not in vocab:
-                continue
-            embd = [float(x) for x in l[1:]]
-            word2embd[word] = embd
+    def replace(sent):
+        return [token if token not in unknowns else TOK_UNK for token in sent]
+    return list(map(replace, sents))
 
-    word2idx = {word: i for i, word in enumerate(vocab)}
-    embd_mat = np.ndarray([len(vocab), size], dtype=np.float32)
-    for word in vocab:
-        embd_mat[word2idx[word]] = word2embd.get(word, np.random.random(size))
-
-    import ipdb; ipdb.set_trace()
-
-    assert(len(embd_mat) == len(word2idx))
-    return np.array(embd_mat), word2idx
-
-def load_glove_words(data_dir, num_tokens, size):
-    sizes = {
-        '6B': [50, 100, 200, 300],
-        '42B': [300],
-    }
-    assert(num_tokens in sizes.keys())
-    assert(size in sizes[num_tokens])
-
-    fname = 'glove.{token}.{size}d.txt'.format(token=num_tokens, size=size)
-    vocab = []
-    with open(os.path.join(data_dir, fname)) as f:
-        vocab = [line.split()[0] for line in f]
-    return vocab
-
-def filter_gutenberg(vocab):
-    gutenberg = LazyCorpusLoader('gutenberg',
-                                 CorpusReader,
-                                 r'(?!\.).*\.txt',
-                                 encoding='latin1')
-    gb_vocab = set()
-    for sent in gutenberg.sents():
-        gb_vocab.update(list(map(str.lower, sent)))
-    vocab = gb_vocab.intersection(vocab)
-    sents = []
-    for sent in gutenberg.sents():
-        for word in sent:
-            if word not in vocab:
-                break
-        else:
-            sents.append(sent)
+def append_pads(sents):
+    """
+    Args:
+        sents: list(list(str))
+    Returns:
+        list(list(str))
+    """
+    sents = copy.deepcopy(sents)
+    max_len = max(len(sent) for sent in sents)
+    for sent in sents:
+        num_pads = max_len-len(sent)
+        sent.extend([TOK_PAD for _ in range(num_pads)])
     return sents
 
-vocab = load_glove_words('data/glove', '42B', 300)
-print('vocab loaded')
-sents = filter_gutenberg(vocab)
-print('sents loaded')
-#sents, vocab = load_gutenberg_dataset()
-#word_embds, word2idx = load_glove('data/glove', 50, set(vocab.keys()))
+def convert_to_idx(sents, word2idx):
+    """
+    Args:
+        sents: list(list(str))
+        word2idx: dict(str: number)
+    Returns:
+        list(list(number))
+    """
+    ret = []
+    for sent in sents:
+        try:
+            ret.append([word2idx[token] for token in sent])
+        except:
+            import ipdb; ipdb.set_trace()
+    return ret
+    #return [[word2idx[token] for token in sent] for sent in sents]
+
+def load_simple_questions_dataset():
+    print('Load SimpleQuestions')
+    questions, answers, sq_vocab = load_simple_questions('data/SimpleQuestions/train.txt', lower=True)
+
+    print('Load GloVe vocab')
+    glove_vocab = load_glove_vocab('data/glove', '42B', 300)
+
+    print('Replace unknown tokens')
+    unknowns = sq_vocab-glove_vocab
+    questions = replace_unknowns(questions, unknowns)
+    vocab = sq_vocab-unknowns
+
+    print('Append pads')
+    max_question_len = max(len(sent) for sent in sents)
+    questions = append_pads(questions)
+    vocab.update([TOK_UNK, TOK_PAD])
+
+    print('Load GloVe embeddings')
+    word2embd, word2idx = load_glove_embeddings('data/glove', '42B', 300, vocab)
+
+    print('Convert to index')
+    questions = convert_to_idx(questions, word2idx)
+
+    return questions, vocab, word2idx, word2embd, max_question_len
+
+def get_batch(data, batch_size):
+    for offset in range(0, len(data), batch_size):
+        yield data[offset:offset+batch_size]
