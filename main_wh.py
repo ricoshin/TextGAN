@@ -3,15 +3,17 @@ import tensorflow as tf
 
 from trainer import Trainer
 from config import get_config
-from utils import prepare_dirs_and_logger, save_config
+from utils import *
+from data import load_simple_questions_dataset
 
 
 def main(config):
-    get_logger()
+    set_logger()
     prepare_dirs(config)
 
     # get trainer instance
-    trainer = Trainer(config)
+    data, W_e_init = load_simple_questions_dataset()
+    trainer = Trainer(config, data, W_e_init)
 
     if config.is_train:
         save_config(config) # save config file(params.json)
