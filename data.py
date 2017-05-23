@@ -1,4 +1,7 @@
 import copy
+import csv
+import numpy as np
+import os
 import re
 
 from glove import load_glove_vocab, load_glove_embeddings
@@ -66,6 +69,15 @@ def convert_to_idx(sents, word2idx):
     #return [[word2idx[token] for token in sent] for sent in sents]
 
 def load_simple_questions_dataset():
+    if os.path.exists('data/data.npz') and os.path.exists('data/word2idx.txt'):
+        print('Load saved data')
+        npz = np.load('data/data.npz')
+        embd_mat = npz['embd_mat']
+        questions = npz['questions'].astype(np.int32)
+        with open('data/word2idx.txt') as f:
+            reader = csv.reader(f, delimiter='\t')
+            word2idx = {row[0]: int(row[1]) for row in reader}
+        return questions, embd_mat, word2idx
     print('Load SimpleQuestions')
     questions, answers, sq_vocab = load_simple_questions('data/SimpleQuestions/train.txt', lower=True)
 
@@ -78,7 +90,7 @@ def load_simple_questions_dataset():
     vocab = sq_vocab-unknowns
 
     print('Append pads')
-    max_question_len = max(len(sent) for sent in sents)
+    max_question_len = max(len(question) for question in questions)
     questions = append_pads(questions)
     vocab.update([TOK_UNK, TOK_PAD])
 
@@ -87,6 +99,12 @@ def load_simple_questions_dataset():
 
     print('Convert to index')
     questions = convert_to_idx(questions, word2idx)
+
+    print('Save data')
+    with open('data/word2idx.txt', 'w') as f:
+        writer = csv.writer(f, delimiter='\t')
+        writer.writerows(word2idx.items())
+    np.savez('data/data.npz', embd_mat=embd_mat, questions=questions)
 
     return questions, embd_mat, word2idx
 
