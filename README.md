@@ -28,7 +28,7 @@ export LANG=en_US.UTF-8
 python -m spacy download en
 ```
 
-- `Please use the NLTK Downloader to obtain the resource:  >>> nltk.download()`
+- `Resource u'tokenizers/punkt/english.pickle' not found.  Please use the NLTK Downloader to obtain the resource:`
 
 ```bash
 python3 -m nltk.downloader punkt
