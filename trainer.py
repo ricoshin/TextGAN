@@ -8,6 +8,7 @@ from utils import *
 import tensorflow as tf
 from models import *
 from data import TOK_PAD
+import random
 
 class Trainer(object):
     def __init__(self, config, data, W_e_init, word2idx):
@@ -72,8 +73,6 @@ class Trainer(object):
 
 
     def build_model(self):
-
-
         #  self, W_e_init, max_sentence_len, num_classes, vocab_size,
         #  embedding_size, filter_sizes, num_filters, data_format, l2_reg_lambda=0.0
         self.D = Discriminator(W_e_init=self.W_e_init,
@@ -124,37 +123,53 @@ class Trainer(object):
 
     def train(self):
 
-        def get_batch(data, batch_size, max_step):
+        def shuffle_batch(data, batch_size, max_step, shuffle=True):
             under = 0
             max = len(data)
             for step in trange(0, max_step):
                 upper = under + batch_size
                 if upper <= max:
                     batch = data[under:upper]
+                    under = upper
                 else:
                     rest = upper - max
-                    batch = np.concatenate(data[under:max], data[0:rest])
+                    if shuffle is True:
+                        np.random.shuffle(data)
+                    batch = np.concatenate((data[under:max], data[0:rest]))
                     under = rest
                 yield step, batch
 
         def swap_random_words(batch, pad_idx):
-            for sent in batch:
-                len_seq = sent.tolist().index(pad_idx)
-                i,j = np.random.choice(len_seq, 2)
+            import copy
+            batch_clone = copy.deepcopy(batch) # for preserving raw data
+            for sent in batch_clone:
+                try:
+                    if pad_idx in sent:
+                        len_sent = sent.tolist().index(pad_idx)
+                    else: # if there's no PAD at all
+                        len_sent = len(sent)
+
+                    if len_sent < 2:
+                        continue # if sent is consist of less than 2 words
+                                 # skip over to the next batch
+                    else:
+                        i,j = random.sample(range(0,len_sent), 2) # prevent duplication
+                except:
+                    import pdb; pdb.set_trace()
                 sent[i], sent[j] = sent[j], sent[i]
-            return batch
+            return batch_clone
 
         def convert_to_onehot(labels, num_classes):
             return np.eye(num_classes)[labels]
 
-        for step, batch in get_batch(self.data, self.batch_size, self.max_step): # 0 - 500000
+        for step, batch in shuffle_batch(self.data, self.batch_size, self.max_step):
 
             data_real = batch[0:int(self.batch_size/2)]
-            data_fake = swap_random_words(batch[int(self.batch_size/2):], self.pad_idx)
-
+            data_fake_raw = batch[int(self.batch_size/2):]
+            data_fake = swap_random_words(data_fake_raw, self.pad_idx)
+            
             label_real = convert_to_onehot(np.ones(int(self.batch_size/2), dtype=np.int), 2)
             label_fake = convert_to_onehot(np.zeros(int(self.batch_size/2), dtype=np.int), 2)
-
 
             data = np.concatenate((data_real, data_fake))
             label = np.concatenate((label_real, label_fake))
@@ -165,7 +180,7 @@ class Trainer(object):
                 "D_loss": self.D.loss,
                 "D_accuracy": self.D.accuracy
             }
-            feed_dict = { # evaluate every step
+            feed_dict = {
                 self.D.input_x: data,
                 self.D.input_y: label,
                 self.D.dropout_keep_prob: self.dropout_keep_prob
@@ -176,7 +191,7 @@ class Trainer(object):
                 })
             result = self.sess.run(fetch_dict, feed_dict)
 
-            if step % self.log_step == 0: # default : 50
+            if  step% self.log_step == 0: # default : 50
                 self.summary_writer.add_summary(result['summary'], step)
                 self.summary_writer.flush()
 
