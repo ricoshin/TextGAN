@@ -12,9 +12,9 @@ def main(config):
     prepare_dirs(config)
 
     # get trainer instance
-    data, W_e_init, word2idx = load_simple_questions_dataset()
+    train, valid, W_e_init, word2idx = load_simple_questions_dataset(config)
     #data, W_e_init, word2idx = 0,0,0
-    trainer = Trainer(config, data, W_e_init, word2idx)
+    trainer = Trainer(config, train[0], W_e_init, word2idx)
 
     if config.is_train:
         save_config(config) # save config file(params.json)

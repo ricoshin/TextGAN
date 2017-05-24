@@ -1,16 +1,21 @@
+import os
+
 from nltk.tokenize import word_tokenize
 
 
-def load_simple_questions(file_path, lower):
+def load_simple_questions(config, lower=True):
     """
     Returns:
-        questions: list(list(str))
+        (train, valid, vocab)
+        train: training set (questions, answers)
+        valid: validation set (questions, answers)
         vocab: set(str)
     """
-    questions = []
-    answers =  []
+    data_dir = os.path.join(config.data_dir, 'SimpleQuestions')
     vocab = set()
-    with open(file_path) as lines:
+    def parse_file(lines, vocab):
+        questions = []
+        answers = []
         for line in lines:
             if lower:
                 line = line.rstrip().lower()
@@ -21,4 +26,9 @@ def load_simple_questions(file_path, lower):
             ques_tokens = word_tokenize(ques)
             questions.append(ques_tokens)
             vocab.update(ques_tokens)
-    return questions, answers, vocab
+        return questions, answers
+    with open(os.path.join(data_dir, 'train.txt')) as lines:
+        train = parse_file(lines, vocab)
+    with open(os.path.join(data_dir, 'valid.txt')) as lines:
+        valid = parse_file(lines, vocab)
+    return train, valid, vocab
