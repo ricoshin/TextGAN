@@ -26,3 +26,9 @@ export LANG=en_US.UTF-8
 ```bash
 python -m spacy download en
 ```
+
+- `Please use the NLTK Downloader to obtain the resource:  >>> nltk.download()`
+
+```bash
+python3 -m nltk.downloader punkt
+```
