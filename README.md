@@ -4,11 +4,12 @@ Implementation of [TextGAN](https://c4209155-a-62cb3a1a-s-sites.googlegroups.com
 
 Requirements
 ------------
-- Python 2.7
+- Python 2.7+, 3.4+
 - Tensorflow 1.1
 - NLTK
 - spaCy
 - parlAI
+- SimpleQuestions
 - [Gutenberg](https://web.eecs.umich.edu/~lahiri/gutenberg_dataset.html)
 - [GloVe](https://nlp.stanford.edu/projects/glove/)
 
@@ -25,4 +26,10 @@ export LANG=en_US.UTF-8
 
 ```bash
 python -m spacy download en
+```
+
+- `Resource u'tokenizers/punkt/english.pickle' not found.  Please use the NLTK Downloader to obtain the resource:`
+
+```bash
+python3 -m nltk.downloader punkt
 ```
