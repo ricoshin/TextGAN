@@ -4,11 +4,12 @@ Implementation of [TextGAN](https://c4209155-a-62cb3a1a-s-sites.googlegroups.com
 
 Requirements
 ------------
-- Python 2.7
+- Python 2.7+, 3.4+
 - Tensorflow 1.1
 - NLTK
 - spaCy
 - parlAI
+- SimpleQuestions
 - [Gutenberg](https://web.eecs.umich.edu/~lahiri/gutenberg_dataset.html)
 - [GloVe](https://nlp.stanford.edu/projects/glove/)
 
