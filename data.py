@@ -5,11 +5,13 @@ import os
 import re
 
 from glove import load_glove_vocab, load_glove_embeddings
+from progress.bar import Bar
 from simple_questions import load_simple_questions
 import sys
 
-reload(sys)
-sys.setdefaultencoding('utf8')
+if sys.version_info[0] == 2:
+    reload(sys)
+    sys.setdefaultencoding('utf8')
 
 TOK_UNK = '-unk-'
 TOK_PAD = '-pad-'
@@ -40,7 +42,7 @@ def replace_unknowns(sents, unknowns):
         return [token if token not in unknowns else TOK_UNK for token in sent]
     return list(map(replace, sents))
 
-def append_pads(sents):
+def append_pads(sents, max_len):
     """
     Args:
         sents: list(list(str))
@@ -48,9 +50,9 @@ def append_pads(sents):
         list(list(str))
     """
     sents = copy.deepcopy(sents)
-    max_len = max(len(sent) for sent in sents)
     for sent in sents:
         num_pads = max_len-len(sent)
+        assert(num_pads >= 0)
         sent.extend([TOK_PAD for _ in range(num_pads)])
     return sents
 
@@ -62,55 +64,85 @@ def convert_to_idx(sents, word2idx):
     Returns:
         list(list(number))
     """
-    ret = []
-    for sent in sents:
-        try:
-            ret.append([word2idx[token] for token in sent])
-        except:
-            import ipdb; ipdb.set_trace()
-    return ret
-    #return [[word2idx[token] for token in sent] for sent in sents]
+    return [[word2idx[token] for token in sent] for sent in sents]
 
-def load_simple_questions_dataset():
-    if os.path.exists('data/data.npz') and os.path.exists('data/word2idx.txt'):
-        print('Load saved data')
-        npz = np.load('data/data.npz')
+def load_simple_questions_dataset(config):
+    bar = Bar(suffix='%(index)d/%(max)d - %(elapsed)ds')
+
+    data_npz = os.path.join(config.data_dir, 'data.npz')
+    word2idx_txt = os.path.join(config.data_dir, 'word2idx.txt')
+
+    if os.path.exists(data_npz) and os.path.exists(word2idx_txt):
+        bar.max = 2
+
+        bar.message = 'Loading npz'
+        bar.next()
+        npz = np.load(data_npz)
         embd_mat = npz['embd_mat']
-        questions = npz['questions'].astype(np.int32)
-        with open('data/word2idx.txt') as f:
+        train_ques = npz['train_ques'].astype(np.int32)
+        train_ans = npz['train_ans'].astype(np.int32)
+        valid_ques = npz['valid_ques'].astype(np.int32)
+        valid_ans = npz['valid_ans'].astype(np.int32)
+
+        bar.message = 'Loading word2idx'
+        bar.next()
+        with open(word2idx_txt) as f:
             reader = csv.reader(f, delimiter='\t')
             word2idx = {row[0]: int(row[1]) for row in reader}
-        return questions, embd_mat, word2idx
-    print('Load SimpleQuestions')
-    questions, answers, sq_vocab = load_simple_questions('data/SimpleQuestions/train.txt', lower=True)
 
-    print('Load GloVe vocab')
-    glove_vocab = load_glove_vocab('data/glove', '42B', 300)
+        bar.finish()
+        train = train_ques, train_ans
+        valid = valid_ques, valid_ans
+        return train, valid, embd_mat, word2idx
 
-    print('Replace unknown tokens')
+    bar.max = 7
+
+    bar.message = 'Loading SimpleQuestions'
+    bar.next()
+    train, valid, sq_vocab = load_simple_questions(config)
+    train_q, train_a = train[0], train[1]
+    valid_q, valid_a= valid[0], valid[1]
+
+    bar.message = 'Loading GloVe vocab'
+    bar.next()
+    glove_vocab = load_glove_vocab(config, '42B', 300)
+
+    bar.message = 'Replacing unknown tokens'
+    bar.next()
     unknowns = sq_vocab-glove_vocab
-    questions = replace_unknowns(questions, unknowns)
+    train_q = replace_unknowns(train_q, unknowns)
+    valid_q= replace_unknowns(valid_q, unknowns)
     vocab = sq_vocab-unknowns
 
-    print('Append pads')
-    max_question_len = max(len(question) for question in questions)
-    questions = append_pads(questions)
+    bar.message = 'Appending pads'
+    bar.next()
+    max_len = max(len(sent) for sent in train_q+valid_q)
+    train_q = append_pads(train_q, max_len)
+    valid_q = append_pads(valid_q, max_len)
     vocab.update([TOK_UNK, TOK_PAD])
 
-    print('Load GloVe embeddings')
-    embd_mat, word2idx = load_glove_embeddings('data/glove', '42B', 300, vocab)
+    bar.message = 'Loading GloVe embeddings'
+    bar.next()
+    embd_mat, word2idx = load_glove_embeddings(config, '42B', 300, vocab)
 
-    print('Convert to index')
-    questions = convert_to_idx(questions, word2idx)
+    bar.message = 'Converting token to index'
+    bar.next()
+    train_q = convert_to_idx(train_q, word2idx)
+    valid_q = convert_to_idx(valid_q, word2idx)
 
-    print('Save data')
-    with open('data/word2idx.txt', 'w') as f:
+    bar.message = 'Saving processed data'
+    bar.next()
+    with open(word2idx_txt, 'w') as f:
         writer = csv.writer(f, delimiter='\t')
         writer.writerows(word2idx.items())
-    np.savez('data/data.npz', embd_mat=embd_mat, questions=questions)
+    data_dict = dict(embd_mat=embd_mat,
+                     train_ques=train_q,
+                     train_ans=train_a,
+                     valid_ques=valid_q,
+                     valid_ans=valid_a)
+    np.savez(data_npz, **data_dict)
 
-    return questions, embd_mat, word2idx
-
-def get_batch(data, batch_size):
-    for offset in range(0, len(data), batch_size):
-        yield data[offset:offset+batch_size]
+    bar.finish()
+    train = train_q, train_a
+    valid = valid_q, valid_a
+    return train, valid, embd_mat, word2idx

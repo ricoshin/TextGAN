@@ -8,19 +8,20 @@ _sizes = {
     '42B': [300],
 }
 
-def load_glove_vocab(data_dir, num_tokens, size):
+def load_glove_vocab(config, num_tokens, size):
     assert(num_tokens in _sizes.keys())
     assert(size in _sizes[num_tokens])
 
+    data_dir = os.path.join(config.data_dir, 'glove')
     fname = 'glove.{token}.{size}d.txt'.format(token=num_tokens, size=size)
     with open(os.path.join(data_dir, fname)) as f:
         vocab = set(line.split()[0] for line in f)
     return vocab
 
-def load_glove_embeddings(data_dir, num_tokens, size, vocab):
+def load_glove_embeddings(config, num_tokens, size, vocab):
     """
     Args:
-        data_dir: Path to pre-trained GloVe embeddings directory
+        num_tokens: '6B' or '42B'
         size: Word embedding size: 50, 100, 200, or 300
     Returns:
         Tuple of GloVe word embeddings matrix of shape [len(vocab), size] and
@@ -30,6 +31,7 @@ def load_glove_embeddings(data_dir, num_tokens, size, vocab):
     assert(size in _sizes[num_tokens])
 
     word2embd = dict()
+    data_dir = os.path.join(config.data_dir, 'glove')
     fname = 'glove.{token}.{size}d.txt'.format(token=num_tokens, size=size)
     with open(os.path.join(data_dir, fname)) as f:
         for line in f:
