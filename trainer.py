@@ -11,21 +11,26 @@ from data import TOK_PAD
 import random
 
 class Trainer(object):
-    def __init__(self, config, data, W_e_init, word2idx):
+    def __init__(self, config, train_data, valid_data, W_e_init, word2idx):
         #  self, W_e_init, max_sentence_len, num_classes, vocab_size,
         #  embedding_size, filter_sizes, num_filters, data_format, l2_reg_lambda=0.0
         #MAX_SENTENCE_LEN = 20
         #VOCAB_SIZE = 1000
         #EMBEDDING_SIZE = 300
         self.batch_size = config.batch_size
-        self.data = np.asarray(data)
+        self.train_data = np.asarray(train_data)
+        self.valid_data = np.asarray(valid_data)
         #self.data = np.random.randint(VOCAB_SIZE, size=(self.batch_size, MAX_SENTENCE_LEN))
         self.W_e_init = np.asarray(W_e_init)
         #self.W_e_init = np.random.rand(VOCAB_SIZE, EMBEDDING_SIZE)
         self.word2idx = word2idx
         self.pad_idx = word2idx[TOK_PAD]
 
-        self.max_sentence_len = self.data.shape[1]
+        if self.train_data.shape[1] == self.valid_data.shape[1]:
+            self.max_sentence_len = self.train_data.shape[1]
+        else:
+            raise Exception("[!] max length of sentence in train & valid data MUST be the same")
+
         self.vocab_size = self.W_e_init.shape[0]
         self.embedding_size = self.W_e_init.shape[1]
 
@@ -45,17 +50,20 @@ class Trainer(object):
         self.g_lr, self.d_lr = config.g_lr, config.d_lr
 
         self.global_step = tf.Variable(0, name="global_step", trainable=False)
+        self.valid_step = config.valid_step
         self.log_step = config.log_step
         self.max_step = config.max_step
         self.save_step = config.save_step
         self.lr_update_step = config.lr_update_step
 
         self.is_train = config.is_train
+        self.validation = config.validation
 
         self.build_model()
 
         self.saver = tf.train.Saver()
-        self.summary_writer = tf.summary.FileWriter(self.model_dir)
+        self.train_summary_writer = tf.summary.FileWriter(self.model_dir+'/train')
+        self.valid_summary_writer = tf.summary.FileWriter(self.model_dir+'/valid')
         self.sv = tf.train.Supervisor(logdir=self.model_dir,
                                 is_chief=True,
                                 saver=self.saver,
@@ -123,68 +131,103 @@ class Trainer(object):
 
     def train(self):
 
-        def shuffle_batch(data, batch_size, max_step, shuffle=True):
-            under = 0
-            max = len(data)
-            for step in trange(0, max_step):
+        class batch_generator(object):
+            def __init__(self, batch_size, train_data, valid_data=None, shuffle=True):
+                self.batch_size = batch_size
+                self.shuffle = shuffle
+
+                self.train_data = train_data
+                self.train_len = len(train_data)
+                self.train_idx = 0
+
+                self.valid_data = valid_data
+                if valid_data:
+                    self.valid_len = len(valid_data)
+                    self.valid_idx = 0
+
+            def get_batch(data, under, max):
                 upper = under + batch_size
                 if upper <= max:
                     batch = data[under:upper]
                     under = upper
                 else:
                     rest = upper - max
-                    if shuffle is True:
+                    if self.shuffle is True:
                         np.random.shuffle(data)
                     batch = np.concatenate((data[under:max], data[0:rest]))
                     under = rest
-                yield step, batch
+                return batch, under
 
-        def swap_random_words(batch, pad_idx):
-            import copy
-            batch_clone = copy.deepcopy(batch) # for preserving raw data
-            for sent in batch_clone:
-                try:
-                    if pad_idx in sent:
-                        len_sent = sent.tolist().index(pad_idx)
-                    else: # if there's no PAD at all
-                        len_sent = len(sent)
 
-                    if len_sent < 2:
-                        continue # if sent is consist of less than 2 words
-                                 # skip over to the next batch
-                    else:
-                        i,j = random.sample(range(0,len_sent), 2) # prevent duplication
-                except:
-                    import pdb; pdb.set_trace()
-                sent[i], sent[j] = sent[j], sent[i]
-            return batch_clone
+            def swap_random_words(batch, pad_idx):
+                import copy
+                batch_clone = copy.deepcopy(batch) # for preserving raw data
+                for sent in batch_clone:
+                    try:
+                        if pad_idx in sent:
+                            len_sent = sent.tolist().index(pad_idx)
+                        else: # if there's no PAD at all
+                            len_sent = len(sent)
+                        if len_sent < 2: # if sent is consist of less than 2 words
+                            continue     # skip over to the next batch
+                        else: # prevent duplication
+                            i,j = random.sample(range(0,len_sent), 2)
+                    except:
+                        import pdb; pdb.set_trace()
+                    sent[i], sent[j] = sent[j], sent[i]
+                return batch_clone
 
-        def convert_to_onehot(labels, num_classes):
-            return np.eye(num_classes)[labels]
+            def convert_to_onehot(labels, num_classes):
+                return np.eye(num_classes)[labels]
 
-        for step, batch in shuffle_batch(self.data, self.batch_size, self.max_step):
+            def generate_true_fake_data_batch(batch, batch_size, pad_idx):
+                data_real = batch[0:int(self.batch_size/2)]
+                data_fake_raw = batch[int(self.batch_size/2):]
+                data_fake = swap_random_words(data_fake_raw, pad_idx)
+                data_concatenated = np.concatenate((data_real, data_fake))
+                return data_concatenated
 
-            data_real = batch[0:int(self.batch_size/2)]
-            data_fake_raw = batch[int(self.batch_size/2):]
-            data_fake = swap_random_words(data_fake_raw, self.pad_idx)
-            
-            label_real = convert_to_onehot(np.ones(int(self.batch_size/2), dtype=np.int), 2)
-            label_fake = convert_to_onehot(np.zeros(int(self.batch_size/2), dtype=np.int), 2)
+            def generate_true_fake_label_batch(batch_size):
+                label_real = convert_to_onehot(np.ones(int(batch_size/2), dtype=np.int), 2)
+                label_fake = convert_to_onehot(np.zeros(batch_size-int(batch_size/2), dtype=np.int), 2)
+                label_concatenated = np.concatenate((label_real, label_fake))
+                return label_concatenated
 
-            data = np.concatenate((data_real, data_fake))
-            label = np.concatenate((label_real, label_fake))
+            def shuffle_bath():
+                train_data = generate_true_fake_data_batch(batch, self.batch_size, self.pad_idx)
+
+
+            def batch_train_valid():
+                self.train_batch, self.train_idx = get_batch(self.train_data, self.train_idx, self.train_len)
+                if self.valid_data:
+                    self.valid_batch, self.valid_idx = get_batch(self.valid_data, self.valid_idx, self.valid_len)
+
+
+            if self.validation is True:
+                # generate valid data & labels
+                print('Generating data & labels for validation monitoring..')
+                valid_data = generate_true_fake_data_batch(self.valid_data, len(self.valid_data), self.pad_idx)
+                valid_label = generate_true_fake_label_batch(len(self.valid_data))
+                print('Done.')
+
+        for step, batch in shuffle_batch(self.train_data, self.batch_size, self.max_step):
+
+            train_data = generate_true_fake_data_batch(batch, self.batch_size, self.pad_idx)
+            train_label = generate_true_fake_label_batch(self.batch_size)
 
             fetch_dict = {
                 "d_train_op": self.d_train_op,
                 "global_step": self.global_step,
-                "D_loss": self.D.loss,
-                "D_accuracy": self.D.accuracy
+                "d_train_loss": self.D.loss,
+                "d_train_accuracy": self.D.accuracy
             }
             feed_dict = {
-                self.D.input_x: data,
-                self.D.input_y: label,
+                self.D.input_x: train_data,
+                self.D.input_y: train_label,
                 self.D.dropout_keep_prob: self.dropout_keep_prob
             }
+
+
             if step % self.log_step == 0: # default : 50
                 fetch_dict.update({
                     "summary": self.summary_op
@@ -195,11 +238,34 @@ class Trainer(object):
                 self.summary_writer.add_summary(result['summary'], step)
                 self.summary_writer.flush()
 
-                d_loss = result['D_loss']
-                d_accuracy = result['D_accuracy']
+                d_loss = result['d_train_loss']
+                d_accuracy = result['d_train_accuracy']
 
                 print("[{}/{}] D_loss: {:.6f} D_accuracy: {:.6f} ". \
                       format(step, self.max_step, d_loss, d_accuracy))
+
+            if self.validation is True:
+                if step % self.valid_step == 0:
+
+                  fetch_dict = {
+                  "d_valid_loss": self.D.loss,
+                  "d_valid_accuracy": self.D.accuracy,
+                  "summary" : self.summary_op
+                  }
+
+                  feed_dict = {
+                  self.D.input_x: valid_data,
+                  self.D.input_y: valid_label,
+                  self.D.dropout_keep_prob: 1 # keep all units ON
+                  }
+
+                  result = self.sess.run(fetch_dict, feed_dict)
+                  d_loss = result['d_valid_loss']
+                  d_accuracy = result['d_valid_accuracy']
+                  print("[Validation] D_loss: {:.6f} D_accuracy: {:.6f} ". \
+                        format(d_loss, d_accuracy))
+                  self.summary_writer.add_summary(result['summary'], step)
+                  self.summary_writer.flush()
 
             if step % (self.log_step * 10) == 0: # default : every 100 steps
                 pass
