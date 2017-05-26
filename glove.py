@@ -8,6 +8,7 @@ _sizes = {
     '42B': [300],
 }
 
+
 def load_glove_vocab(config, num_tokens, size):
     assert(num_tokens in _sizes.keys())
     assert(size in _sizes[num_tokens])
@@ -17,6 +18,7 @@ def load_glove_vocab(config, num_tokens, size):
     with open(os.path.join(data_dir, fname)) as f:
         vocab = set(line.split()[0] for line in f)
     return vocab
+
 
 def load_glove_embeddings(config, num_tokens, size, vocab):
     """

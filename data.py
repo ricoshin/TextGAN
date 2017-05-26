@@ -78,13 +78,31 @@ def convert_to_token(sents, word2idx, trim=True):
              if not (trim and idx2word[idx] == TOK_PAD)] for sent in sents]
 
 
-def load_simple_questions_dataset(config):
+def remove_unknown_answers(data, vocab):
+    data = zip(data[0], data[1])
+
+    questions = []
+    answers = []
+    new_vocab = set()
+    for q, a in data:
+        if len(a) == 1 and a[0] in vocab:
+            questions.append(q)
+            answers.append(a)
+        elif len(a) > 1 and '_'.join(a) in vocab:
+            questions.append(q)
+            answers.append(a)
+            new_vocab.add('_'.join(a))
+    return (questions, answers), new_vocab
+
+
+def load_simple_questions_dataset(config, force_reload=False):
     bar = Bar(suffix='%(index)d/%(max)d - %(elapsed)ds')
 
     data_npz = os.path.join(config.data_dir, 'data.npz')
     word2idx_txt = os.path.join(config.data_dir, 'word2idx.txt')
 
-    if os.path.exists(data_npz) and os.path.exists(word2idx_txt):
+    if (os.path.exists(data_npz) and os.path.exists(word2idx_txt)
+        and not force_reload):
         bar.max = 2
 
         bar.message = 'Loading npz'
@@ -109,34 +127,32 @@ def load_simple_questions_dataset(config):
 
     bar.max = 8
 
-    bar.message = 'Loading SimpleQuestions'
-    bar.next()
-    train, valid, sq_vocab = load_simple_questions(config, max_ans_len=1)
-    # TODO: join tokens with _ and check if exists
-    train_q, train_a = train[0], train[1]
-    valid_q, valid_a = valid[0], valid[1]
-
     bar.message = 'Loading GloVe vocab'
     bar.next()
     glove_vocab = load_glove_vocab(config, '42B', 300)
 
+    bar.message = 'Loading SimpleQuestions'
+    bar.next()
+    train, valid, dataset_vocab = load_simple_questions(config)
+
+    bar.message = 'Removing unknown answers'
+    train, new_vocab = remove_unknown_answers(train, glove_vocab)
+    dataset_vocab.update(new_vocab)
+
+    valid, new_vocab = remove_unknown_answers(valid, glove_vocab)
+    dataset_vocab.update(new_vocab)
+
+    train_q, train_a = train[0], train[1]
+    valid_q, valid_a = valid[0], valid[1]
+
     bar.message = 'Replacing unknown tokens'
     bar.next()
-    unknowns = sq_vocab-glove_vocab
+    unknowns = dataset_vocab-glove_vocab
     train_q = replace_unknowns(train_q, unknowns)
     train_a = replace_unknowns(train_a, unknowns)
     valid_q = replace_unknowns(valid_q, unknowns)
     valid_a = replace_unknowns(valid_a, unknowns)
-    vocab = sq_vocab-unknowns
-
-    bar.message = 'Filtering out answers composed of unknowns'
-    bar.next()
-    train = [(q, a) for q, a in zip(train_q, train_a) if a != TOK_UNK]
-    train_q = [q for q, _ in train]
-    train_a = [a for _, a in train]
-    valid = [(q, a) for q, a in zip(valid_q, valid_a) if a != TOK_UNK]
-    valid_q = [q for q, _ in valid]
-    valid_a = [a for _, a in valid]
+    vocab = dataset_vocab-unknowns
 
     bar.message = 'Appending pads'
     bar.next()
