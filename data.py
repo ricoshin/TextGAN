@@ -73,7 +73,8 @@ def convert_to_idx(sents, word2idx):
 
 def convert_to_token(sents, word2idx, trim=True):
     idx2word = {v: k for k, v in word2idx.items()}
-    return [[idx2word[idx] for idx in sent \
+    # TODO: it is not trimming but removing only PAD.
+    return [[idx2word[idx] for idx in sent
              if not (trim and idx2word[idx] == TOK_PAD)] for sent in sents]
 
 
@@ -106,11 +107,12 @@ def load_simple_questions_dataset(config):
         valid = valid_ques, valid_ans
         return train, valid, embd_mat, word2idx
 
-    bar.max = 7
+    bar.max = 8
 
     bar.message = 'Loading SimpleQuestions'
     bar.next()
-    train, valid, sq_vocab = load_simple_questions(config)
+    train, valid, sq_vocab = load_simple_questions(config, max_ans_len=1)
+    # TODO: join tokens with _ and check if exists
     train_q, train_a = train[0], train[1]
     valid_q, valid_a = valid[0], valid[1]
 
@@ -127,14 +129,20 @@ def load_simple_questions_dataset(config):
     valid_a = replace_unknowns(valid_a, unknowns)
     vocab = sq_vocab-unknowns
 
+    bar.message = 'Filtering out answers composed of unknowns'
+    bar.next()
+    train = [(q, a) for q, a in zip(train_q, train_a) if a != TOK_UNK]
+    train_q = [q for q, _ in train]
+    train_a = [a for _, a in train]
+    valid = [(q, a) for q, a in zip(valid_q, valid_a) if a != TOK_UNK]
+    valid_q = [q for q, _ in valid]
+    valid_a = [a for _, a in valid]
+
     bar.message = 'Appending pads'
     bar.next()
     max_len = max(len(sent) for sent in train_q+valid_q)
     train_q = append_pads(train_q, max_len)
-    train_a = append_pads(train_a, max_len)
-    max_len = max(len(sent) for sent in train_a+valid_a)
     valid_q = append_pads(valid_q, max_len)
-    valid_a = append_pads(valid_a, max_len)
     vocab.update([TOK_UNK, TOK_PAD])
 
     bar.message = 'Loading GloVe embeddings'
@@ -161,6 +169,6 @@ def load_simple_questions_dataset(config):
     np.savez(data_npz, **data_dict)
 
     bar.finish()
-    train = train_q, train_a
-    valid = valid_q, valid_a
+    train = np.array(train_q), np.array(train_a)
+    valid = np.array(valid_q), np.array(valid_a)
     return train, valid, embd_mat, word2idx

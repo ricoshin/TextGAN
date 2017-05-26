@@ -3,7 +3,7 @@ import os
 from nltk.tokenize import word_tokenize
 
 
-def load_simple_questions(config, lower=True):
+def load_simple_questions(config, max_ans_len=1, lower=True):
     """
     Returns:
         (train, valid, vocab)
@@ -13,6 +13,7 @@ def load_simple_questions(config, lower=True):
     """
     data_dir = os.path.join(config.data_dir, 'SimpleQuestions')
     vocab = set()
+
     def parse_file(lines, vocab):
         questions = []
         answers = []
@@ -23,12 +24,14 @@ def load_simple_questions(config, lower=True):
                 line = line.rstrip()
             ques, ans = line.split('\t')
 
-            ques = ques[2:] # remove heading number and space
+            ans_tokens = word_tokenize(ans)
+            if len(ans_tokens) > max_ans_len:
+                continue
+            answers.append(ans_tokens)
+
+            ques = ques[2:]  # remove heading number and space
             ques_tokens = word_tokenize(ques)
             questions.append(ques_tokens)
-
-            ans_tokens = word_tokenize(ans)
-            answers.append(ans_tokens)
 
             vocab.update(ques_tokens + ans_tokens)
         return questions, answers

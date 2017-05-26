@@ -8,13 +8,13 @@ class Generator(object):
                  hid_dim=100):
         self.is_pre_train = is_pre_train
         with tf.variable_scope('G'):
+            self.batch_size = tf.placeholder(tf.int32, [], name='batch_size')
             word_embd = tf.Variable(word_embd, name='word_embd',
-                                         dtype=tf.float32)
-            word_embd_size, vocab_size  = word_embd.get_shape().as_list()
+                                    dtype=tf.float32)
+            vocab_size, word_embd_size = word_embd.get_shape().as_list()
             self.z = tf.placeholder(tf.float32,
                                     shape=[None, z_dim],
                                     name='z')
-            batch_size = self.z.get_shape().as_list()[0]
             self.answers = tf.placeholder(tf.int32,
                                           shape=[None],
                                           name='answers')
@@ -29,10 +29,10 @@ class Generator(object):
             ans_embd = tf.nn.embedding_lookup(word_embd, self.answers,
                                               name='ans_embd')
             # [batch_size, z_dim + word_embd_size]
-            za = tf.concat([self.z, answers], axis=1, name='za')
+            za = tf.concat([self.z, ans_embd], axis=1, name='za')
 
             # [batch_size, hid_dim]
-            h_1 = tf.matmul(za, C, 'h_1')
+            h_1 = tf.matmul(za, C)
             # [batch_size, vocab_size]
             hV_1 = tf.matmul(h_1, V)
             # [batch_size]
@@ -43,14 +43,15 @@ class Generator(object):
 
             cell = tf.contrib.rnn.LSTMCell(hid_dim)
 
-            state = cell.zero_state(batch_size, dtype=tf.float32)
-            state.h = h_1
+            state = cell.zero_state(self.batch_size, dtype=tf.float32)
+            state = tf.contrib.rnn.LSTMStateTuple(state.c, h_1)
 
             pre_train_losses = []
             if self.is_pre_train:
-                inputs = tf.nn.embedding_lookup(word_embd, targets[:, 0])
+                inputs = tf.nn.embedding_lookup(word_embd, self.targets[:, 0])
+                inputs = tf.stop_gradient(inputs)
 
-                labels = tf.one_hot(targets[:, 0], vocab_size, axis=-1)
+                labels = tf.one_hot(self.targets[:, 0], vocab_size, axis=-1)
                 loss = tf.nn.softmax_cross_entropy_with_logits(logits=hV_1,
                                                                labels=labels)
                 pre_train_losses.append(loss)
@@ -64,27 +65,31 @@ class Generator(object):
                 self.outputs.append(w_t)
                 y_t = tf.nn.embedding_lookup(word_embd, w_t)
                 if self.is_pre_train:
-                    inputs = tf.nn.embedding_lookup(word_embd, targets[:, t])
-                    labels = tf.one_hot(targets[:, t], vocab_size, axis=-1)
-                    loss = tf.nn.softmax_cross_entropy_with_logits(logits=hV,
-                                                                   labels=labels)
+                    inputs = tf.nn.embedding_lookup(word_embd,
+                                                    self.targets[:, t])
+                    labels = tf.one_hot(self.targets[:, t], vocab_size, axis=-1)
+                    loss = tf.nn.softmax_cross_entropy_with_logits(
+                        logits=hV, labels=labels)
                     pre_train_losses.append(loss)
                 else:
                     inputs = y_t
-                variable_scope.get_variable_scope().reuse_variables()
+                tf.get_variable_scope().reuse_variables()
             self.pre_train_loss = tf.reduce_mean(pre_train_losses,
-                                                 name = 'pre_train_loss')
+                                                 name='pre_train_loss')
 
-    def update(self, sess, answers, z, targets=None):
-        if self.is_pre_train and not targets:
-            raise Error('targets needed when pre-training')
+    def update(self, sess, train_op, z, answers, targets=None):
+        if self.is_pre_train and targets is None:
+            raise Exception('targets needed when pre-training')
+        batch_size = answers.shape[0]
         feed_dict = {
+            self.batch_size: batch_size,
             self.z: z,
-            self.answers: answers,
+            self.answers: np.reshape(answers, [batch_size]),
             self.targets: targets,
         }
         if self.is_pre_train:
-            outputs, loss = sess.run([self.outputs, self.loss], feed_dict)
+            return sess.run([self.outputs, self.pre_train_loss, train_op],
+                            feed_dict)
         else:
             outputs = sess.run(self.outputs, feed_dict)
         return outputs
