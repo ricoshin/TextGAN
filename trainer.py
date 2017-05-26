@@ -11,6 +11,7 @@ from models import *
 from data import TOK_PAD
 import random
 
+
 class Trainer(object):
     def __init__(self, config, train_data, valid_data, W_e_init, word2idx):
 
