@@ -22,10 +22,15 @@ def load_simple_questions(config, lower=True):
             else:
                 line = line.rstrip()
             ques, ans = line.split('\t')
+
             ques = ques[2:] # remove heading number and space
             ques_tokens = word_tokenize(ques)
             questions.append(ques_tokens)
-            vocab.update(ques_tokens)
+
+            ans_tokens = word_tokenize(ans)
+            answers.append(ans_tokens)
+
+            vocab.update(ques_tokens + ans_tokens)
         return questions, answers
     with open(os.path.join(data_dir, 'train.txt')) as lines:
         train = parse_file(lines, vocab)

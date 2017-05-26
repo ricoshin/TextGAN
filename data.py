@@ -16,6 +16,7 @@ if sys.version_info[0] == 2:
 TOK_UNK = '-unk-'
 TOK_PAD = '-pad-'
 
+
 def find_abbr_candidates(text):
     abbr_regex = re.compile('(\s\w+\s([A-Z][a-z]*\.([A-Za-z]\.)*)\s\w+)')
     known_abbrs = ['mr.', 'mrs.', 'dr.', 'st.']
@@ -24,11 +25,12 @@ def find_abbr_candidates(text):
     cand_dict = dict()
     for cand in candidates:
         examples = cand_dict.get(cand[1].lower())
-        if examples == None:
+        if examples is None:
             cand_dict[cand[1].lower()] = []
             examples = cand_dict[cand[1].lower()]
         examples.append(cand[0])
     return cand_dict
+
 
 def replace_unknowns(sents, unknowns):
     """
@@ -41,6 +43,7 @@ def replace_unknowns(sents, unknowns):
     def replace(sent):
         return [token if token not in unknowns else TOK_UNK for token in sent]
     return list(map(replace, sents))
+
 
 def append_pads(sents, max_len):
     """
@@ -56,6 +59,7 @@ def append_pads(sents, max_len):
         sent.extend([TOK_PAD for _ in range(num_pads)])
     return sents
 
+
 def convert_to_idx(sents, word2idx):
     """
     Args:
@@ -65,6 +69,13 @@ def convert_to_idx(sents, word2idx):
         list(list(number))
     """
     return [[word2idx[token] for token in sent] for sent in sents]
+
+
+def convert_to_token(sents, word2idx, trim=True):
+    idx2word = {v: k for k, v in word2idx.items()}
+    return [[idx2word[idx] for idx in sent \
+             if not (trim and idx2word[idx] == TOK_PAD)] for sent in sents]
+
 
 def load_simple_questions_dataset(config):
     bar = Bar(suffix='%(index)d/%(max)d - %(elapsed)ds')
@@ -101,7 +112,7 @@ def load_simple_questions_dataset(config):
     bar.next()
     train, valid, sq_vocab = load_simple_questions(config)
     train_q, train_a = train[0], train[1]
-    valid_q, valid_a= valid[0], valid[1]
+    valid_q, valid_a = valid[0], valid[1]
 
     bar.message = 'Loading GloVe vocab'
     bar.next()
@@ -111,14 +122,19 @@ def load_simple_questions_dataset(config):
     bar.next()
     unknowns = sq_vocab-glove_vocab
     train_q = replace_unknowns(train_q, unknowns)
-    valid_q= replace_unknowns(valid_q, unknowns)
+    train_a = replace_unknowns(train_a, unknowns)
+    valid_q = replace_unknowns(valid_q, unknowns)
+    valid_a = replace_unknowns(valid_a, unknowns)
     vocab = sq_vocab-unknowns
 
     bar.message = 'Appending pads'
     bar.next()
     max_len = max(len(sent) for sent in train_q+valid_q)
     train_q = append_pads(train_q, max_len)
+    train_a = append_pads(train_a, max_len)
+    max_len = max(len(sent) for sent in train_a+valid_a)
     valid_q = append_pads(valid_q, max_len)
+    valid_a = append_pads(valid_a, max_len)
     vocab.update([TOK_UNK, TOK_PAD])
 
     bar.message = 'Loading GloVe embeddings'
@@ -128,7 +144,9 @@ def load_simple_questions_dataset(config):
     bar.message = 'Converting token to index'
     bar.next()
     train_q = convert_to_idx(train_q, word2idx)
+    train_a = convert_to_idx(train_a, word2idx)
     valid_q = convert_to_idx(valid_q, word2idx)
+    valid_a = convert_to_idx(valid_a, word2idx)
 
     bar.message = 'Saving processed data'
     bar.next()
