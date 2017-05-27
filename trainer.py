@@ -125,9 +125,13 @@ class Trainer(object):
 
         self.d_lr_update = tf.assign(self.d_lr, (self.d_lr * 0.5), name='d_lr_update')
 
+    def train_adversarial(self):
+        with self.sv.managed_session() as sess:
+            pass
+
+
     def train(self):
         with self.sv.managed_session() as sess:
-
 
             from data_loader import Dataset
             from data_loader import Batch_generator
@@ -163,7 +167,7 @@ class Trainer(object):
                 step = result['global_step']
 
 
-                if  step% self.log_step == 0: # default : 50
+                if  step % self.log_step == 0: # default : 50
                     #self.summary_writer.add_summary(result['summary'], step)
                     fetch_dict.update({
                     "d_train_loss": self.D.loss,
@@ -232,6 +236,54 @@ class Trainer(object):
                     sess.run(self.d_lr_update)
 
     def test_interactive(self):
+
         with self.sv.managed_session() as sess:
-            sent = raw_input('Test >> ')
-            
+
+            message = """
+            #################################################################
+            ### This is interactive test session for CharCNN Discriminator###
+            #################################################################
+            """
+            print(message)
+
+            from nltk.tokenize import word_tokenize
+            from data import TOK_UNK
+            from data import append_pads
+            from data import replace_unknowns
+            from data import convert_to_idx
+
+            voca = self.word2idx.keys()
+            max_len = self.max_sentence_len
+            sent = ""
+
+            while sent != 'exit':
+                sent = raw_input('Test >> ')
+
+                words = word_tokenize(sent)
+                unknowns = list(set(words)-set(voca))
+                unknowns_str = ', '.join(str(unknown) for unknown in unknowns)
+                if len(unknowns>0):
+                    print('[INFO] Unknown words : '+ unknowns_str)
+
+                words = replace_unknowns([words], unknowns)[0]
+                words_padded = append_pads([words], max_len)[0]
+                input_matrix = convert_to_idx([words_padded], self.word2idx)
+
+                fetch_dict = {
+                    'score': self.D.scores,
+                    'prediction': self.D.predictions
+                }
+                feed_dict = {
+                    self.D.input_x: input_matrix,
+                    self.D.dropout_keep_prob: 1
+                }
+                result = sess.run(fetch_dict, feed_dict)
+                score = result['score'][0]
+                prediction = bool(result['prediction'][0])
+                #import pdb; pdb.set_trace()
+                print('[result] score : {:.3f}/{:.3f}, prediction : {}'.\
+                                format(score[0], score[1], prediction))
+            print('End of test loop.')
+                #self.word2idx
+        def test(self):
+            pass

@@ -175,7 +175,7 @@ class Discriminator(object):
                 self.scores = tf.nn.xw_plus_b(self.h_drop, W, b, name="scores") # [batch_size, 2]
                 self.predictions = tf.argmax(self.scores, 1, name="predictions")
                 # No need to pass through softmax.
-
+                
             # CalculateMean cross-entropy loss
             with tf.name_scope("loss"):
                 losses = tf.nn.softmax_cross_entropy_with_logits(logits=self.scores, labels=self.input_y)
