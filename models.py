@@ -77,7 +77,7 @@ class Generator(object):
             self.pre_train_loss = tf.reduce_mean(pre_train_losses,
                                                  name='pre_train_loss')
 
-    def update(self, sess, train_op, z, answers, targets=None):
+    def pre_train(self, sess, train_op, z, answers, targets=None):
         if self.is_pre_train and targets is None:
             raise Exception('targets needed when pre-training')
         batch_size = answers.shape[0]
