@@ -17,6 +17,7 @@ parser = argparse.ArgumentParser()
 settings_arg = add_argument_group('settings')
 settings_arg.add_argument('--dataset', type=str, default='mydataset')
 settings_arg.add_argument('--is_train', type=str2bool, default=True)
+settings_arg.add_argument('--trainer_mode', type=str, choices=['D','G','GAN'], default='GAN')
 settings_arg.add_argument('--interactive', type=str2bool, default=True)
 settings_arg.add_argument('--validation', type=str2bool, default=True)
 settings_arg.add_argument('--early_stopping', type=str2bool, default=True)
@@ -36,7 +37,7 @@ file_paths_arg.add_argument('--data_dir', type=str, default='data')
 
 hyper_params_arg = add_argument_group('hyper_params')
 hyper_params_arg.add_argument('--batch_size', type=int, default=128)
-hyper_params_arg.add_argument('--z_num', type=int, default=128, choices=[64, 128])
+hyper_params_arg.add_argument('--z_dim', type=int, default=128, choices=[64, 128])
 
 hyper_params_arg.add_argument('--optimizer', type=str, default='adam')
 hyper_params_arg.add_argument('--d_lr', type=float, default=0.00002) # learning rate of Discriminator
