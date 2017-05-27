@@ -26,7 +26,7 @@ settings_arg.add_argument('--use_gpu', type=str2bool, default=True)
 settings_arg.add_argument('--save_step', type=int, default=5000)
 settings_arg.add_argument('--valid_step', type=int, default=100)
 settings_arg.add_argument('--log_step', type=int, default=50)
-settings_arg.add_argument('--max_step', type=int, default=500000)
+settings_arg.add_argument('--max_step', type=int, default=10000000)
 
 file_paths_arg = add_argument_group('file_paths')
 file_paths_arg.add_argument('--load_path', type=str, default='')
@@ -36,7 +36,7 @@ file_paths_arg.add_argument('--data_dir', type=str, default='data')
 
 hyper_params_arg = add_argument_group('hyper_params')
 hyper_params_arg.add_argument('--batch_size', type=int, default=128)
-hyper_params_arg.add_argument('--z_num', type=int, default=128, choices=[64, 128])
+hyper_params_arg.add_argument('--z_dim', type=int, default=128, choices=[64, 128])
 
 hyper_params_arg.add_argument('--optimizer', type=str, default='adam')
 hyper_params_arg.add_argument('--d_lr', type=float, default=0.00002) # learning rate of Discriminator

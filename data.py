@@ -90,8 +90,9 @@ def remove_unknown_answers(data, vocab):
             answers.append(a)
         elif len(a) > 1 and '_'.join(a) in vocab:
             questions.append(q)
-            answers.append(a)
-            new_vocab.add('_'.join(a))
+            a = '_'.join(a)
+            answers.append([a])
+            new_vocab.add(a)
     return (questions, answers), new_vocab
 
 
@@ -136,6 +137,7 @@ def load_simple_questions_dataset(config, force_reload=False):
     train, valid, dataset_vocab = load_simple_questions(config)
 
     bar.message = 'Removing unknown answers'
+    bar.next()
     train, new_vocab = remove_unknown_answers(train, glove_vocab)
     dataset_vocab.update(new_vocab)
 
