@@ -29,13 +29,15 @@ settings_arg.add_argument('--valid_step', type=int, default=100)
 settings_arg.add_argument('--log_step', type=int, default=50)
 settings_arg.add_argument('--max_step', type=int, default=10000000)
 settings_arg.add_argument('--save_model_secs', type=int, default=60)
-settings_arg.add_argument('--g_per_d_train', type=int, default=5) 
+settings_arg.add_argument('--g_per_d_train', type=int, default=5)
 
 file_paths_arg = add_argument_group('file_paths')
 file_paths_arg.add_argument('--load_path', type=str, default='')
 file_paths_arg.add_argument('--log_level', type=str, default='INFO', choices=['INFO', 'DEBUG', 'WARN'])
 file_paths_arg.add_argument('--log_dir', type=str, default='logs') #
 file_paths_arg.add_argument('--data_dir', type=str, default='data')
+file_paths_arg.add_argument('--g_path', type=str, default='')
+file_paths_arg.add_argument('--d_path', type=str, default='')
 
 hyper_params_arg = add_argument_group('hyper_params')
 hyper_params_arg.add_argument('--batch_size', type=int, default=128)

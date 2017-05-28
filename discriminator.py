@@ -29,7 +29,8 @@ class Discriminator(object):
                 embed_list = []
                 for i in range(0, 128):
 
-                    #self.embed = tf.nn.embedding_lookup(self.W_e, self.questions)
+                    self.embed = tf.nn.embedding_lookup(self.W_e, self.questions)
+                    import pdb; pdb.set_trace()
                     embed = tf.matmul(self.que_onehot[i] ,self.W_e)
                     embed_expanded = tf.expand_dims(embed, 0)
                     embed_list.append(embed_expanded)
@@ -43,7 +44,7 @@ class Discriminator(object):
                 self.embed = tf.concat(embed_list, axis=0)
                 self.embed_expanded = tf.expand_dims(self.embed, 1)
 
-            import pdb; pdb.set_trace()
+
             # Create a convolution + maxpool layer for each filter size
             pooled_outputs = []
             for i, filter_size in enumerate(filter_sizes):
