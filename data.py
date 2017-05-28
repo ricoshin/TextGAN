@@ -7,7 +7,7 @@ import sys
 
 from progress.bar import Bar
 from simple_questions import load_simple_questions
-from skt_nugu import load_skt_nugu
+from skt_nugu import load_skt_nugu, load_skt_nugu_samples
 from wordvec import (load_fasttext_vocab, load_fasttext_embeddings,
                      load_glove_vocab, load_glove_embeddings)
 
@@ -98,14 +98,72 @@ def remove_unknown_answers(data, vocab):
     return (questions, answers), new_vocab
 
 
+def load_skt_nugu_sample_dataset(config):
+    data_npz = os.path.join(config.data_dir, 'data_skt_nugu_sample.npz')
+    word2idx_txt = os.path.join(config.data_dir, 'word2idx_skt_nugu_sample.txt')
+    ans2idx_txt = os.path.join(config.data_dir, 'ans2idx_skt_nugu_sample.txt')
+
+    if (os.path.exists(data_npz) and os.path.exists(word2idx_txt) and
+            os.path.exists(ans2idx_txt)):
+        npz = np.load(data_npz)
+        embd_mat = npz['embd_mat']
+        ques = npz['ques'].astype(np.int32)
+        ans = npz['ans'].astype(np.int32)
+
+        with open(word2idx_txt) as f:
+            reader = csv.reader(f, delimiter='\t')
+            word2idx = {row[0]: int(row[1]) for row in reader}
+        with open(ans2idx_txt) as f:
+            reader = csv.reader(f, delimiter='\t')
+            ans2idx = {row[0]: int(row[1]) for row in reader}
+
+        train = ques, ans
+        return train, ans2idx, embd_mat, word2idx
+
+    path = os.path.join(config.data_dir, 'fasttext')
+    fast_vocab = load_fasttext_vocab(path, 'ko')
+
+    path = os.path.join(config.data_dir, 'skt-nugu')
+    ques, ans, nugu_vocab = load_skt_nugu_samples(path)
+
+    unknown_vocab = nugu_vocab-fast_vocab
+    ques = replace_unknowns(ques, unknown_vocab)
+
+    vocab = nugu_vocab-unknown_vocab
+    vocab.update([TOK_UNK, TOK_PAD])
+
+    max_ques_len = max(len(sent) for sent in ques)
+    ques = append_pads(ques, max_ques_len)
+
+    embd_mat, word2idx = load_fasttext_embeddings(os.path.join(config.data_dir,
+                                                               'fasttext'),
+                                                  'ko', vocab)
+
+    ques = convert_to_idx(ques, word2idx)
+    ans2idx = {ans: i for i, ans in enumerate(set(ans))}
+    ans = [ans2idx[a] for a in ans]
+
+    with open(word2idx_txt, 'w') as f:
+        writer = csv.writer(f, delimiter='\t')
+        writer.writerows(word2idx.items())
+    with open(ans2idx_txt, 'w') as f:
+        writer = csv.writer(f, delimiter='\t')
+        writer.writerows(ans2idx.items())
+    np.savez(data_npz, embd_mat=embd_mat, ques=ques, ans=ans)
+
+    train = np.array(ques), np.array(ans)
+    return train, ans2idx, embd_mat, word2idx
+
+
 def load_nugu_dataset(config):
     data_npz = os.path.join(config.data_dir, 'data_skt_nugu.npz')
     word2idx_txt = os.path.join(config.data_dir, 'word2idx_skt_nugu.txt')
 
-    fast_vocab = load_fasttext_vocab(os.path.join(config.data_dir, 'fasttext'),
-                                     'ko')
-    ques, ans, nugu_vocab = load_skt_nugu(os.path.join(config.data_dir,
-                                                       'skt-nugu'))
+    path = os.path.join(config.data_dir, 'fasttext')
+    fast_vocab = load_fasttext_vocab(path, 'ko')
+
+    path = os.path.join(config.data_dir, 'skt-nugu')
+    ques, ans, nugu_vocab = load_skt_nugu(path, 200)
 
     ques_keys = ques.keys()
     ans_keys = ans.keys()

@@ -4,8 +4,8 @@ slim = tf.contrib.slim
 
 
 class Generator(object):
-    def __init__(self, word_embd, max_ques_len, is_pre_train, z_dim=100,
-                 hid_dim=100):
+    def __init__(self, word_embd, max_ques_len, num_answers, is_pre_train,
+                 z_dim=100, hid_dim=100):
         self.is_pre_train = is_pre_train
         with tf.variable_scope('G'):
             self.batch_size = tf.placeholder(tf.int32, [], name='batch_size')
@@ -22,14 +22,22 @@ class Generator(object):
                                           shape=[None, max_ques_len],
                                           name='targets')
             V = tf.Variable(tf.random_normal([hid_dim, vocab_size]), name='V')
-            C = tf.Variable(tf.random_normal([z_dim + word_embd_size, hid_dim]),
+
+            # C = tf.Variable(tf.random_normal([z_dim+word_embd_size, hid_dim]),
+            #                 name='C')
+            C = tf.Variable(tf.random_normal([z_dim+num_answers, hid_dim]),
                             name='C')
 
-            # [batch_size, word_embd_size]
-            ans_embd = tf.nn.embedding_lookup(word_embd, self.answers,
-                                              name='ans_embd')
-            # [batch_size, z_dim + word_embd_size]
-            za = tf.concat([self.z, ans_embd], axis=1, name='za')
+            # # [batch_size, word_embd_size]
+            # ans_embd = tf.nn.embedding_lookup(word_embd, self.answers,
+            #                                   name='ans_embd')
+            # # [batch_size, z_dim + word_embd_size]
+            # za = tf.concat([self.z, ans_embd], axis=1, name='za')
+
+            # [batch_size, num_answers]
+            ans_onehot = tf.one_hot(self.answers, num_answers, axis=-1)
+            # [batch_size, z_dim + num_answers]
+            za = tf.concat([self.z, ans_onehot], axis=1, name='za')
 
             # [batch_size, hid_dim]
             h_1 = tf.matmul(za, C)
@@ -49,7 +57,7 @@ class Generator(object):
             pre_train_losses = []
             if self.is_pre_train:
                 inputs = tf.nn.embedding_lookup(word_embd, self.targets[:, 0])
-                inputs = tf.stop_gradient(inputs)
+                # inputs = tf.stop_gradient(inputs)
 
                 labels = tf.one_hot(self.targets[:, 0], vocab_size, axis=-1)
                 loss = tf.nn.softmax_cross_entropy_with_logits(logits=hV_1,
@@ -175,7 +183,7 @@ class Discriminator(object):
                 self.scores = tf.nn.xw_plus_b(self.h_drop, W, b, name="scores") # [batch_size, 2]
                 self.predictions = tf.argmax(self.scores, 1, name="predictions")
                 # No need to pass through softmax.
-                
+
             # CalculateMean cross-entropy loss
             with tf.name_scope("loss"):
                 losses = tf.nn.softmax_cross_entropy_with_logits(logits=self.scores, labels=self.input_y)

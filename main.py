@@ -1,13 +1,9 @@
 from __future__ import print_function
 
-import numpy as np
-import tensorflow as tf
-
 from trainer import Trainer
-from models import Generator
 from config import get_config
 from utils import set_logger, prepare_dirs, save_config
-from data import convert_to_token, load_simple_questions_dataset
+from data import load_skt_nugu_sample_dataset, load_simple_questions_dataset
 from g_trainer import GTrainer
 
 
@@ -33,8 +29,8 @@ def main(config):
 
 
 def main_G(config):
-    train, valid, word_embd, word2idx = load_simple_questions_dataset(config)
-    g_trainer = GTrainer(config, train, valid, word_embd, word2idx)
+    train, ans2idx, word_embd, word2idx = load_skt_nugu_sample_dataset(config)
+    g_trainer = GTrainer(config, train, None, word_embd, word2idx, ans2idx)
     g_trainer.train()
 
 if __name__ == "__main__":
