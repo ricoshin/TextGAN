@@ -164,12 +164,12 @@ class Discriminator(object):
             # Combine all the pooled features
             num_filters_total = num_filters * len(filter_sizes)
             self.h_pool = tf.concat(pooled_outputs, 1) # concatenate along channel axis
-            self.h_pool_flat = tf.reshape(self.h_pool, [-1, num_filters_total])
+            self.feature = tf.reshape(self.h_pool, [-1, num_filters_total])
             # squeeze all the other dimensions.. *NOTE* check later
-
+            import pdb; pdb.set_trace()
             # Add dropout
             with tf.name_scope("dropout"):
-                self.h_drop = tf.nn.dropout(self.h_pool_flat, self.dropout_keep_prob)
+                self.h_drop = tf.nn.dropout(self.feature, self.dropout_keep_prob)
 
             # Final (unnormalized) scores and predictions
             with tf.name_scope("output"):

@@ -6,7 +6,7 @@ import numpy as np
 import tensorflow as tf
 
 from data import convert_to_token
-from models import Generator
+from generator import Generator
 
 
 class GTrainer(object):
