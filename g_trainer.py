@@ -4,7 +4,7 @@ import numpy as np
 import tensorflow as tf
 
 from data import convert_to_token
-from models import Generator
+from generator import Generator
 
 
 class GTrainer(object):
@@ -38,7 +38,7 @@ class GTrainer(object):
                                                      self.config.batch_size,
                                                      self.config.max_step)):
             questions, answers, z = batch
-            result = self.generator.pre_train(sess, train_op, z, answers,
+            result = self.generator.run(sess, train_op, z, answers,
                                               questions)
             outputs = result[0]
             loss = result[1]

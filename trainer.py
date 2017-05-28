@@ -12,7 +12,7 @@ from data import TOK_PAD
 import random
 
 
-class AdversarialTrainer(object):
+class GANTrainer(object):
     def __init__(self, config, train_data, valid_data, W_e_init, word2idx):
 
         self.batch_size = config.batch_size
