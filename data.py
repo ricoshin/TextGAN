@@ -3,11 +3,13 @@ import csv
 import numpy as np
 import os
 import re
+import sys
 
-from glove import load_glove_vocab, load_glove_embeddings
 from progress.bar import Bar
 from simple_questions import load_simple_questions
-import sys
+from skt_nugu import load_skt_nugu
+from wordvec import (load_fasttext_vocab, load_fasttext_embeddings,
+                     load_glove_vocab, load_glove_embeddings)
 
 if sys.version_info[0] == 2:
     reload(sys)
@@ -96,14 +98,66 @@ def remove_unknown_answers(data, vocab):
     return (questions, answers), new_vocab
 
 
+def load_nugu_dataset(config):
+    data_npz = os.path.join(config.data_dir, 'data_skt_nugu.npz')
+    word2idx_txt = os.path.join(config.data_dir, 'word2idx_skt_nugu.txt')
+
+    fast_vocab = load_fasttext_vocab(os.path.join(config.data_dir, 'fasttext'),
+                                     'ko')
+    ques, ans, nugu_vocab = load_skt_nugu(os.path.join(config.data_dir,
+                                                       'skt-nugu'))
+
+    ques_keys = ques.keys()
+    ans_keys = ans.keys()
+    for key in set(ques_keys)-set(ans_keys):
+        del ques[key]
+    for key in set(ans_keys)-set(ques_keys):
+        del ans[key]
+    assert(set(ques.keys()) == set(ans.keys()))
+    keys = set(ans.keys())
+
+    pairs = []
+    for key in keys:
+        for a in ans[key]:
+            for q in ques[key]:
+                pairs.append((q, a))
+    ques = [pair[0] for pair in pairs]
+    ans = [pair[1] for pair in pairs]
+
+    unknown_vocab = nugu_vocab-fast_vocab
+    ques = replace_unknowns(ques, unknown_vocab)
+    ans = replace_unknowns(ans, unknown_vocab)
+    vocab = nugu_vocab-unknown_vocab
+    vocab.update([TOK_UNK, TOK_PAD])
+
+    max_ques_len = max(len(sent) for sent in ques)
+    ques = append_pads(ques, max_ques_len)
+    max_ans_len = max(len(sent) for sent in ans)
+    ans = append_pads(ans, max_ans_len)
+
+    embd_mat, word2idx = load_fasttext_embeddings(os.path.join(config.data_dir,
+                                                               'fasttext'),
+                                                  'ko', vocab)
+
+    ques = convert_to_idx(ques, word2idx)
+    ans = convert_to_idx(ans, word2idx)
+
+    with open(word2idx_txt, 'w') as f:
+        writer = csv.writer(f, delimiter='\t')
+        writer.writerows(word2idx.items())
+    np.savez(data_npz, embd_mat=embd_mat, ques=ques, ans=ans)
+
+    return ques, ans, embd_mat, word2idx
+
+
 def load_simple_questions_dataset(config, force_reload=False):
     bar = Bar(suffix='%(index)d/%(max)d - %(elapsed)ds')
 
     data_npz = os.path.join(config.data_dir, 'data.npz')
     word2idx_txt = os.path.join(config.data_dir, 'word2idx.txt')
 
-    if (os.path.exists(data_npz) and os.path.exists(word2idx_txt)
-        and not force_reload):
+    if (os.path.exists(data_npz) and os.path.exists(word2idx_txt) and
+            not force_reload):
         bar.max = 2
 
         bar.message = 'Loading npz'
@@ -130,7 +184,8 @@ def load_simple_questions_dataset(config, force_reload=False):
 
     bar.message = 'Loading GloVe vocab'
     bar.next()
-    glove_vocab = load_glove_vocab(config, '42B', 300)
+    glove_vocab = load_glove_vocab(os.path.join(config.data_dir, 'glove'),
+                                   '42B', 300)
 
     bar.message = 'Loading SimpleQuestions'
     bar.next()
@@ -165,7 +220,9 @@ def load_simple_questions_dataset(config, force_reload=False):
 
     bar.message = 'Loading GloVe embeddings'
     bar.next()
-    embd_mat, word2idx = load_glove_embeddings(config, '42B', 300, vocab)
+    embd_mat, word2idx = load_glove_embeddings(os.path.join(config.data_dir,
+                                                            'glove'),
+                                               '42B', 300, vocab)
 
     bar.message = 'Converting token to index'
     bar.next()
