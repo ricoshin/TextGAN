@@ -73,8 +73,8 @@ class DTrainer(object):
         d_optimizer = self.optimizer(self.cfg.d_lr)
 
         grads_and_vars = d_optimizer.compute_gradients(self.D.loss)
-        self.d_train_op = d_optimizer.apply_gradients(
-                                   grads_and_vars, global_step=self.global_step)
+        self.d_train_op = d_optimizer.apply_gradients(grads_and_vars,
+                                                   global_step=self.global_step)
 
         # Keep track of gradient values and sparsity (optional)
         for _grads, _vars in grads_and_vars:

@@ -33,12 +33,21 @@ class GANTrainer(object):
         self.build_model()
 
         self.saver = tf.train.Saver()
+
+        pretrain_g_saver = tf.train.Saver()
+        pretrain_d_saver = tf.train.Saver()
+
+        def load_pretrain(sess):
+            pretrain_g_saver.restore(sess, self.cfg.g_path)
+            pretrain_d_saver.restore(sess, self.cfg.d_path)
+
         self.writer = tf.summary.FileWriter(self.cfg.model_dir)
 
         self.sv = tf.train.Supervisor(logdir=self.cfg.model_dir,
                                 is_chief=True,
                                 saver=self.saver,
                                 summary_op=None,
+                                #init_fn=load_pretrain,
                                 #summary_writer=self.summary_writer,
                                 save_model_secs=self.cfg.save_model_secs,
                                 global_step=self.global_step,
@@ -119,13 +128,12 @@ class GANTrainer(object):
         d_grads_vars = d_optimizer.compute_gradients(self.D.loss, self.D.vars)
         self.d_train_op = d_optimizer.apply_gradients(d_grads_vars)
         g_grads_vars = g_optimizer.compute_gradients(self.G.loss, self.G.vars)
-        import pdb; pdb.set_trace()
         self.g_train_op = g_optimizer.apply_gradients(g_grads_vars,
                                                  global_step=self.global_step)
 
         # Keep track of gradient values and sparsity (optional)
-        grad_vars = g_grads_vars + d_grads_vars
-        for _grads, _vars in grads_and_vars:
+        grads_vars = g_grads_vars + d_grads_vars
+        for _grads, _vars in grads_vars:
             if _grads is not None:
                 tf.summary.histogram("{}/grad/hist".format(_vars.name), _grads)
                 tf.summary.scalar("{}/grad/sparsity".format(_vars.name),
@@ -144,15 +152,15 @@ class GANTrainer(object):
                                      name='d_lr_update')
 
     def run_gan(self, sess, ops, feed_list):
-        """feed_list = list([quenstion, answer, label, z])"""
+        """feed_list = list([quenstions, answers, labels, z])"""
+        questions, answers, labels, z = feed_list
         batch_size = answers.shape[0]
-        question, answer, label, z = feed_list
         feed_dict = {
             self.G.batch_size: batch_size,
             self.G.z: z,
             self.G.answers: np.reshape(answers, [batch_size]),
-            self.D.que_real: question,
-            self.D.answers: np.concatenate((answer,answer), axis=1)
+            self.D.questions: questions,
+            self.D.answers: np.concatenate((answers,answers), axis=0)
         }
         return sess.run(ops, feed_dict)
 
@@ -167,10 +175,9 @@ class GANTrainer(object):
         train_generator = BatchGenerator(train_dataset)
         label = train_generator.get_gan_label_batch()
 
-
         dropout_prob = self.cfg.d_dropout_prob
-        pbar = tqdm(total = self.max_step)
-        step = sess.run(self.global_step)
+        pbar = tqdm(total = self.cfg.max_step)
+        step = self.sess.run(self.global_step)
 
         if step > 1:
             pbar.update(step)

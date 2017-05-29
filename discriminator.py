@@ -10,11 +10,8 @@ class Discriminator(object):
             # Placeholders for input, output and dropout
             x_dim = [None, max_sentence_len]
             y_dim = [None, num_classes]
-            if que_fake:
-                self.que_real = tf.placeholder(tf.int32, x_dim, name="real_x")
-                self.questions = tf.concat([self.que_real, que_fake],axis=0)
-            else:
-                self.questions = tf.placeholder(tf.int32, x_dim, name="input_x")
+                #self.questions = tf.concat([self.que_real, que_fake],axis=0)
+            self.questions = tf.placeholder(tf.int32, x_dim, name="input_x")
             self.labels = tf.placeholder(tf.float32, y_dim, name="input_y")
             self.answers = tf.placeholder(tf.int32,[None,1],name="condition")
             self.dropout_prob = tf.placeholder(tf.float32, name="dropout_prob")
@@ -24,26 +21,27 @@ class Discriminator(object):
 
             # Embedding layer
             with tf.name_scope("embedding"):
-                self.que_onehot = tf.one_hot(self.questions,
-                                          depth=vocab_size,axis=-1)
-                embed_list = []
-                for i in range(0, 128):
+                embed_real = tf.nn.embedding_lookup(self.W_e, self.questions)
+                if que_fake:
+                    h = embedding_size
+                    v = vocab_size
+                    m = max_sentence_len
+                    
+                    #que_onehot = tf.one_hot(self.questions,depth=vocab_size,axis=-1)
+                    que_fake = tf.reshape(que_fake, [-1, v])
+                    embed_fake = tf.matmul(que_fake, self.W_e)
+                    embed_fake = tf.reshape(embed_fake, [-1, m ,h])
+                    embed = tf.concat([embed_real, embed_fake], axis=0)
+                else:
+                    embed = embed_real
 
-                    self.embed = tf.nn.embedding_lookup(self.W_e, self.questions)
-                    import pdb; pdb.set_trace()
-                    embed = tf.matmul(self.que_onehot[i] ,self.W_e)
-                    embed_expanded = tf.expand_dims(embed, 0)
-                    embed_list.append(embed_expanded)
-
-
-                    # [batch_size, max_sentence_len, embedding_size]
-#                self.embed_expanded = tf.expand_dims(self.embed, 1)
+                self.embed_expanded = tf.expand_dims(embed, 1)
+                # [batch_size, max_sentence_len, embedding_size]
+                # self.embed_expanded = tf.expand_dims(self.embed, 1)
                 # [batch_size, 1, max_sentence_len, embedding_size]
                 # expand the channel dimension for conv2d operation
 
-                self.embed = tf.concat(embed_list, axis=0)
-                self.embed_expanded = tf.expand_dims(self.embed, 1)
-
+                #self.embed = tf.concat(embed_list, axis=0)
 
             # Create a convolution + maxpool layer for each filter size
             pooled_outputs = []

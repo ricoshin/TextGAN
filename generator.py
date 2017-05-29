@@ -38,7 +38,7 @@ class Generator(object):
             w_1 = tf.cast(word_prob, tf.int32)
             #w_1 = tf.argmax(hV_1, axis=1)
 
-            self.outputs = [w_1]
+            self.outputs = [word_prob]
             # [batch_size, word_embd_size]
             #y_1 = tf.nn.embedding_lookup(word_embd, w_1)
             y_1 = tf.matmul(word_prob, word_embd)
@@ -71,7 +71,7 @@ class Generator(object):
                 word_prob = tf.nn.softmax(hV*10000)
                 w_t = tf.cast(word_prob, tf.int32)
 
-                self.outputs.append(w_t)
+                self.outputs.append(word_prob)
                 #self.que_fake = tf.nn.embedding_lookup(word_embd, self.outputs)
                 y_t = tf.matmul(word_prob, word_embd)
 

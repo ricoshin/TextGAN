@@ -90,7 +90,7 @@ class BatchGenerator(object):
         return self.dataset.current_batch_que, self.dataset.current_batch_ans
 
     def get_gan_label_batch(self):
-        batch_size = self.train_dataset.batch_size
+        batch_size = self.dataset.batch_size
         label_real = self.dense_to_onehot(np.ones(batch_size, dtype=np.int), 2)
         label_fake = self.dense_to_onehot(np.zeros(batch_size, dtype=np.int), 2)
         return np.concatenate((label_real, label_fake))

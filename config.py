@@ -36,11 +36,12 @@ file_paths_arg.add_argument('--load_path', type=str, default='')
 file_paths_arg.add_argument('--log_level', type=str, default='INFO', choices=['INFO', 'DEBUG', 'WARN'])
 file_paths_arg.add_argument('--log_dir', type=str, default='logs') #
 file_paths_arg.add_argument('--data_dir', type=str, default='data')
-file_paths_arg.add_argument('--g_path', type=str, default='')
 file_paths_arg.add_argument('--d_path', type=str, default='')
+file_paths_arg.add_argument('--g_path', type=str, default='')
+
 
 hyper_params_arg = add_argument_group('hyper_params')
-hyper_params_arg.add_argument('--batch_size', type=int, default=128)
+hyper_params_arg.add_argument('--batch_size', type=int, default=2)
 hyper_params_arg.add_argument('--z_dim', type=int, default=128, choices=[64, 128])
 hyper_params_arg.add_argument('--d_dropout_prob', type=float, default=0.5)
 hyper_params_arg.add_argument('--d_num_filters', type=int, default=300)
