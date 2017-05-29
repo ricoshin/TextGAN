@@ -37,7 +37,7 @@ class GTrainer(object):
         opt = tf.train.AdamOptimizer(self.config.g_lr)
         train_op = opt.minimize(self.generator.pre_train_loss)
 
-        sv = tf.train.Supervisor(logdir=self.config.g_path,
+        sv = tf.train.Supervisor(logdir=self.config.model_dir,
                                  save_model_secs=self.config.save_model_secs)
         with sv.managed_session() as sess:
             for i, batch in enumerate(

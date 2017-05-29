@@ -37,14 +37,15 @@ class GANTrainer(object):
 
         self.saver = tf.train.Saver()
 
-        pretrain_g_saver = tf.train.Saver()
-        pretrain_d_saver = tf.train.Saver()
+        pretrain_g_saver = tf.train.Saver(self.G.vars)
+        pretrain_d_saver = tf.train.Saver(self.D_fake.vars)
 
         def load_pretrain(sess):
             #import pdb; pdb.set_trace()
             pretrain_g_saver.restore(sess, self.cfg.g_path)
-            #pretrain_d_saver.restore(sess, self.cfg.d_path)
             print("[!] Pre-trained generator chkpt loaded : ", self.cfg.g_path)
+            pretrain_d_saver.restore(sess, self.cfg.d_path)
+            print("[!] Pre-trained discriminator chkpt loaded : ", self.cfg.d_path)
 
         self.writer = tf.summary.FileWriter(self.cfg.model_dir)
 
@@ -92,10 +93,10 @@ class GANTrainer(object):
         g_loss = term_1 + term_2_2
         return g_loss
 
-    def compute_generator_loss_tmp(self, d_feature):
+    def compute_generator_loss_tmp(self, feature_real, feature_fake):
 
-        feature_real = d_feature[0:self.batch_size]
-        feature_fake = d_feature[self.batch_size:]
+        #feature_real = d_feature[0:self.batch_size]
+        #feature_fake = d_feature[self.batch_size:]
         return tf.reduce_mean(tf.square(tf.subtract(feature_real,feature_fake)))
 
     def build_model(self):
@@ -107,18 +108,33 @@ class GANTrainer(object):
                            is_pre_train=False,
                            z_dim=self.cfg.z_dim)
 
-        self.D = Discriminator(W_e_init=self.W_e_init,
-                               max_sentence_len=self.max_sentence_len,
-                               num_classes=2,
-                               vocab_size=self.vocab_size,
-                               embedding_size=self.embedding_size,
-                               filter_sizes=self.filter_sizes,
-                               num_filters=self.cfg.d_num_filters,
-                               data_format=self.cfg.data_format,
-                               l2_reg_lambda=self.cfg.d_l2_reg_lambda,
-                               que_fake=self.G.outputs)
+        self.D_fake = Discriminator(W_e_init=self.W_e_init,
+                                    max_sentence_len=self.max_sentence_len,
+                                    num_classes=2,
+                                    vocab_size=self.vocab_size,
+                                    embedding_size=self.embedding_size,
+                                    filter_sizes=self.filter_sizes,
+                                    num_filters=self.cfg.d_num_filters,
+                                    data_format=self.cfg.data_format,
+                                    l2_reg_lambda=self.cfg.d_l2_reg_lambda,
+                                    que_fake=self.G.outputs)
 
-        self.G.loss = self.compute_generator_loss_tmp(self.D.feature)#D.feature)
+        self.D_real = Discriminator(W_e_init=self.W_e_init,
+                                    max_sentence_len=self.max_sentence_len,
+                                    num_classes=2,
+                                    vocab_size=self.vocab_size,
+                                    embedding_size=self.embedding_size,
+                                    filter_sizes=self.filter_sizes,
+                                    num_filters=self.cfg.d_num_filters,
+                                    data_format=self.cfg.data_format,
+                                    l2_reg_lambda=self.cfg.d_l2_reg_lambda,
+                                    que_fake=None,
+                                    reuse=True)
+
+        self.g_loss = self.compute_generator_loss_tmp(self.D_real.feature,
+                                                      self.D_fake.feature)#D.feature)
+        self.d_loss = (self.D_real.loss + self.D_fake.loss)/2
+        self.d_accuracy = (self.D_real.accuracy + self.D_fake.accuracy)/2
 
         if self.cfg.optimizer == 'adam':
             self.optimizer = tf.train.AdamOptimizer
@@ -131,9 +147,10 @@ class GANTrainer(object):
         g_optimizer = tf.train.AdamOptimizer(self.g_lr)
         d_optimizer = self.optimizer(self.d_lr)
         #import pdb; pdb.set_trace()
-        d_grads_vars = d_optimizer.compute_gradients(self.D.loss, self.D.vars)
+        d_grads_vars = d_optimizer.compute_gradients(self.d_loss,
+                                                     self.D_real.vars)
+        g_grads_vars = g_optimizer.compute_gradients(self.g_loss, self.G.vars)
         self.d_train_op = d_optimizer.apply_gradients(d_grads_vars)
-        g_grads_vars = g_optimizer.compute_gradients(self.G.loss, self.G.vars)
         self.g_train_op = g_optimizer.apply_gradients(g_grads_vars,
                                                  global_step=self.global_step)
 
@@ -145,9 +162,9 @@ class GANTrainer(object):
                 tf.summary.scalar("{}/grad/sparsity".format(_vars.name),
                                   tf.nn.zero_fraction(_grads))
 
-        tf.summary.scalar("Loss/G_loss", self.G.loss)
-        tf.summary.scalar("Loss/D_loss", self.D.loss)
-        tf.summary.scalar("misc/D_accuracy", self.D.accuracy)
+        tf.summary.scalar("Loss/G_loss", self.g_loss)
+        tf.summary.scalar("Loss/D_loss", self.d_loss)
+        tf.summary.scalar("misc/D_accuracy", self.d_accuracy)
         tf.summary.scalar("misc/G_learning_rate", self.g_lr)
         tf.summary.scalar("misc/D_learning_rate", self.d_lr)
 
@@ -157,20 +174,25 @@ class GANTrainer(object):
         self.d_lr_update = tf.assign(self.d_lr, (self.d_lr * 0.5),
                                      name='d_lr_update')
 
-    def run_gan(self, sess, ops, feed_list, dropout_prob):
+    def run_gan(self, sess, ops, feed_list):
         """feed_list = list([quenstions, answers, labels, z])"""
-        questions, answers, labels, z = feed_list
+        questions, answers, z, dropout_prob = feed_list
         batch_size = answers.shape[0]
-        answers_d = np.concatenate((answers,answers), axis=0)
-        answers_d = np.reshape(answers_d, [len(answers_d), 1])
+        answers_g = np.reshape(answers, [batch_size])   # *NOTE*answer shape
+        answers_d = np.reshape(answers, [batch_size, 1])# better be unified!
+        labels_real = self.label_real
+        labels_fake = self.label_fake
         feed_dict = {
             self.G.batch_size: batch_size,
             self.G.z: z,
-            self.G.answers: np.reshape(answers, [batch_size]),
-            self.D.questions: questions,
-            self.D.answers: answers_d,
-            self.D.labels: labels,
-            self.D.dropout_prob: dropout_prob,
+            self.G.answers: answers_g,
+            self.D_real.questions: questions,
+            self.D_real.answers: answers_d,
+            self.D_real.labels: labels_real,
+            self.D_real.dropout_prob: dropout_prob,
+            self.D_fake.answers: answers_d,
+            self.D_fake.labels: labels_fake,
+            self.D_fake.dropout_prob: dropout_prob,
         }
         return sess.run(ops, feed_dict)
 
@@ -181,47 +203,55 @@ class GANTrainer(object):
         from data_loader import Dataset
         from data_loader import BatchGenerator
 
-        train_dataset = Dataset(self.data_train, self.batch_size, self.pad_idx)
+        train_dataset = Dataset(self.data_train, self.batch_size,
+                                self.vocab_size, self.pad_idx)
         train_generator = BatchGenerator(train_dataset)
-        label = train_generator.get_gan_label_batch()
+        self.label_real = train_generator.get_binary_label_batch(True)
+        self.label_fake = train_generator.get_binary_label_batch(False)
 
         dropout_prob = self.cfg.d_dropout_prob
         pbar = tqdm(total = self.cfg.max_step)
         step = self.sess.run(self.global_step)
-        z_test = np.random.uniform(-1, 1, [self.batch_size, self.cfg.z_dim])
+        z_test = np.random.uniform(-1, 1,[self.cfg.num_samples, self.cfg.z_dim])
+        ans_test = np.asarray([ 3,3,1,1,2,2 ]) # len(ans_cls) : total test batch size
 
         if step > 1:
             pbar.update(step)
 
         while not self.sv.should_stop():
             pbar.update(1)
-
             que_real, ans_real = train_generator.get_gan_data_batch()
-            z = np.random.uniform(-1, 1, [self.batch_size, self.cfg.z_dim])
-            feed = [que_real, ans_real, label, z]
-            ops = [self.global_step, self.G.loss, self.g_train_op]
-            step, g_loss, _ = self.run_gan(self.sess, ops, feed, dropout_prob)
 
+            # G train
+            z = np.random.uniform(-1, 1, [self.batch_size, self.cfg.z_dim])
+            feed = [que_real, ans_real, z, dropout_prob]
+            ops = [self.global_step, self.g_loss, self.g_train_op]
+            step, g_loss, _ = self.run_gan(self.sess, ops, feed)
+
+            # D train
             if not step % self.cfg.g_per_d_train == 0:
                 continue
             z = np.random.uniform(-1, 1, [self.batch_size, self.cfg.z_dim])
-            feed = [que_real, ans_real, label, z]
-            ops = [self.D.loss,self.summary_op, self.d_train_op]
-            d_loss, summary, _ = self.run_gan(self.sess, ops, feed,dropout_prob)
+            feed = [que_real, ans_real, z, dropout_prob]
+            ops = [self.d_loss,self.summary_op, self.d_train_op]
+            d_loss, summary, _ = self.run_gan(self.sess, ops, feed)
 
+            # summary & print message
             if not step % (self.cfg.g_per_d_train*10) == 0:
                 continue
             print_msg = "[{}/{}] G_loss: {:.6f} D_loss: {:.6f} ".\
                          format(step, self.cfg.max_step, g_loss, d_loss)
             print(print_msg)
             self.writer.add_summary(summary, step)
-            feed = [que_real, ans_real, label, z_test]
-            outputs = self.run_gan(self.sess, self.G.outputs, feed, 1)
+
+            # print generated samples
+            feed = [que_real, ans_test, z_test, 1]
+            outputs = self.run_gan(self.sess, self.G.outputs, feed)
             outputs = np.argmax(outputs, axis=-1)
             answers = [self.idx2ans[ans]
-                      for ans in ans_real[:self.cfg.num_samples]]
+                      for ans in ans_test[:self.cfg.num_samples]]
             from data import convert_to_token
-            outputs = np.array(outputs).transpose()[:self.cfg.num_samples]
+            #outputs = np.array(outputs).transpose()[:self.cfg.num_samples]
             outputs = convert_to_token(outputs, self.word2idx)
 
             for ans, ques in zip(answers, outputs):
