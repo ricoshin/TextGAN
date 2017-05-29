@@ -126,6 +126,8 @@ def load_skt_nugu_sample_dataset(config):
     path = os.path.join(config.data_dir, 'skt-nugu')
     ques, ans, nugu_vocab = load_skt_nugu_samples(path)
 
+    import ipdb; ipdb.set_trace()
+
     unknown_vocab = nugu_vocab-fast_vocab
     ques = replace_unknowns(ques, unknown_vocab)
 

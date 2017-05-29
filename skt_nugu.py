@@ -1,6 +1,6 @@
 import os
 
-# from konlpy.tag import Twitter
+from konlpy.tag import Twitter
 import numpy as np
 from tqdm import tqdm
 

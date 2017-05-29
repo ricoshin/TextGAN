@@ -22,7 +22,7 @@ class Discriminator(object):
             # Embedding layer
             with tf.name_scope("embedding"):
                 embed_real = tf.nn.embedding_lookup(self.W_e, self.questions)
-                if que_fake:
+                if que_fake is not None:
                     h = embedding_size
                     v = vocab_size
                     m = max_sentence_len

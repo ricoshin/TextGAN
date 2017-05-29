@@ -18,14 +18,14 @@ def main(config):
     prepare_dirs(config)
 
     # get trainer instance
-    train, valid, W_e_init, word2idx = load_simple_questions_dataset(config)
+    train, ans2idx, W_e_init, word2idx = load_skt_nugu_sample_dataset(config)
     #data, W_e_init, word2idx = 0,0,0
     if config.trainer_mode == "G":
-        trainer = GTrainer(config, train, valid, W_e_init, word2idx)
+        trainer = GTrainer(config, train, valid, W_e_init, word2idx, ans2idx)
     elif config.trainer_mode == "D":
         trainer = DTrainer(config, train, valid, W_e_init, word2idx)
     else: # config.trainer_mode == "GAN":
-        trainer = GANTrainer(config, train, valid, W_e_init, word2idx)
+        trainer = GANTrainer(config, train, None, W_e_init, word2idx, ans2idx)
 
     if config.is_train:
         save_config(config) # save config file(params.json)

@@ -6,7 +6,7 @@ class Generator(object):
     def __init__(self, word_embd, max_ques_len, num_answers, is_pre_train,
                  z_dim=100, hid_dim=100):
         self.is_pre_train = is_pre_train
-        with tf.variable_scope('G'):
+        with tf.variable_scope('G') as vs:
             self.batch_size = tf.placeholder(tf.int32, [], name='batch_size')
             word_embd = tf.Variable(word_embd, name='word_embd',
                                     dtype=tf.float32)
@@ -17,9 +17,10 @@ class Generator(object):
             self.answers = tf.placeholder(tf.int32,
                                           shape=[None],
                                           name='answers')
-            self.targets = tf.placeholder(tf.int32,
-                                          shape=[None, max_ques_len],
-                                          name='targets')
+            if self.is_pre_train:
+                self.targets = tf.placeholder(tf.int32,
+                                              shape=[None, max_ques_len],
+                                              name='targets')
             V = tf.Variable(tf.random_normal([hid_dim, vocab_size]), name='V')
 
             # C = tf.Variable(tf.random_normal([z_dim+word_embd_size, hid_dim]),
@@ -79,6 +80,7 @@ class Generator(object):
                 # y_t = tf.nn.embedding_lookup(word_embd, w_t)
                 y_t = tf.matmul(w_t, word_embd)
 
+
                 if self.is_pre_train:
                     inputs = tf.nn.embedding_lookup(word_embd,
                                                     self.targets[:, t])
@@ -89,8 +91,10 @@ class Generator(object):
                 else:
                     inputs = y_t
                 tf.get_variable_scope().reuse_variables()
+            self.outputs = tf.transpose(self.outputs, [1, 0, 2])
             self.pre_train_loss = tf.reduce_mean(pre_train_losses,
                                                  name='pre_train_loss')
+        self.vars = tf.contrib.framework.get_variables(vs)
 
     def run(self, sess, train_op, z, answers, targets=None):
         if self.is_pre_train and targets is None:

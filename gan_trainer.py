@@ -14,7 +14,8 @@ import random
 
 
 class GANTrainer(object):
-    def __init__(self, config, train_data, valid_data, W_e_init, word2idx):
+    def __init__(self, config, train_data, valid_data, W_e_init, word2idx,
+                 ans2idx):
 
         self.cfg = config
         self.batch_size = config.batch_size
@@ -23,6 +24,8 @@ class GANTrainer(object):
 
         self.W_e_init = np.asarray(W_e_init)
         self.word2idx = word2idx
+        self.ans2idx = ans2idx
+        self.idx2ans = {v: k for k, v in ans2idx.items()}
         self.pad_idx = word2idx[TOK_PAD]
         self.max_sentence_len = np.asarray(train_data[0]).shape[1]
         self.vocab_size = self.W_e_init.shape[0]
@@ -91,12 +94,13 @@ class GANTrainer(object):
 
         feature_real = d_feature[0:self.batch_size]
         feature_fake = d_feature[self.batch_size:]
-        return tf.square(tf.subtract(feature_real,feature_fake))
+        return tf.reduce_mean(tf.square(tf.subtract(feature_real,feature_fake)))
 
     def build_model(self):
         #  self, W_e_init, max_sentence_len, num_classes, vocab_size,
         #  embedding_size, filter_sizes, num_filters, data_format, l2_reg_lambda=0.0
         self.G = Generator(word_embd=self.W_e_init,
+                           num_answers=len(self.ans2idx),
                            max_ques_len= self.max_sentence_len,
                            is_pre_train=False,
                            z_dim=self.cfg.z_dim)
@@ -151,16 +155,20 @@ class GANTrainer(object):
         self.d_lr_update = tf.assign(self.d_lr, (self.d_lr * 0.5),
                                      name='d_lr_update')
 
-    def run_gan(self, sess, ops, feed_list):
+    def run_gan(self, sess, ops, feed_list, dropout_prob):
         """feed_list = list([quenstions, answers, labels, z])"""
         questions, answers, labels, z = feed_list
         batch_size = answers.shape[0]
+        answers_d = np.concatenate((answers,answers), axis=0)
+        answers_d = np.reshape(answers_d, [len(answers_d), 1])
         feed_dict = {
             self.G.batch_size: batch_size,
             self.G.z: z,
             self.G.answers: np.reshape(answers, [batch_size]),
             self.D.questions: questions,
-            self.D.answers: np.concatenate((answers,answers), axis=0)
+            self.D.answers: answers_d,
+            self.D.labels: labels,
+            self.D.dropout_prob: dropout_prob,
         }
         return sess.run(ops, feed_dict)
 
@@ -178,6 +186,7 @@ class GANTrainer(object):
         dropout_prob = self.cfg.d_dropout_prob
         pbar = tqdm(total = self.cfg.max_step)
         step = self.sess.run(self.global_step)
+        z_test = np.random.uniform(-1, 1, [self.batch_size, self.cfg.z_dim])
 
         if step > 1:
             pbar.update(step)
@@ -187,18 +196,31 @@ class GANTrainer(object):
 
             que_real, ans_real = train_generator.get_gan_data_batch()
             z = np.random.uniform(-1, 1, [self.batch_size, self.cfg.z_dim])
-            feed = [que_real, ans_real, None, z]
+            feed = [que_real, ans_real, label, z]
             ops = [self.global_step, self.G.loss, self.g_train_op]
-            step, g_loss, _ = self.run_gan(self.sess, ops, feed)
+            step, g_loss, _ = self.run_gan(self.sess, ops, feed, dropout_prob)
 
             if not step % self.cfg.g_per_d_train == 0:
                 continue
             z = np.random.uniform(-1, 1, [self.batch_size, self.cfg.z_dim])
             feed = [que_real, ans_real, label, z]
             ops = [self.D.loss,self.summary_op, self.d_train_op]
-            d_loss, summary, _ = self.run_gan(self.sess, ops, feed)
+            d_loss, summary, _ = self.run_gan(self.sess, ops, feed,dropout_prob)
 
+            if not step % self.cfg.g_per_d_train*100 == 0:
+                continue
             print_msg = "[{}/{}] G_loss: {:.6f} D_loss: {:.6f} ".\
                          format(step, self.cfg.max_step, g_loss, d_loss)
             print(print_msg)
             self.writer.add_summary(summary, step)
+            feed = [que_real, ans_real, label, z_test]
+            outputs = self.run_gan(self.sess, self.G.outputs, feed, 1)
+            outputs = np.argmax(outputs, axis=-1)
+            answers = [self.idx2ans[ans]
+                      for ans in ans_real[:self.cfg.num_samples]]
+            from data import convert_to_token
+            outputs = np.array(outputs).transpose()[:self.cfg.num_samples]
+            outputs = convert_to_token(outputs, self.word2idx)
+
+            for ans, ques in zip(answers, outputs):
+                print('%20s => %s' % (ans, ' '.join(ques)))
