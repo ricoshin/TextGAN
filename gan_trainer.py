@@ -41,8 +41,10 @@ class GANTrainer(object):
         pretrain_d_saver = tf.train.Saver()
 
         def load_pretrain(sess):
+            #import pdb; pdb.set_trace()
             pretrain_g_saver.restore(sess, self.cfg.g_path)
-            pretrain_d_saver.restore(sess, self.cfg.d_path)
+            #pretrain_d_saver.restore(sess, self.cfg.d_path)
+            print("[!] Pre-trained generator chkpt loaded : ", self.cfg.g_path)
 
         self.writer = tf.summary.FileWriter(self.cfg.model_dir)
 
@@ -50,7 +52,7 @@ class GANTrainer(object):
                                 is_chief=True,
                                 saver=self.saver,
                                 summary_op=None,
-                                #init_fn=load_pretrain,
+                                init_fn=load_pretrain,
                                 #summary_writer=self.summary_writer,
                                 save_model_secs=self.cfg.save_model_secs,
                                 global_step=self.global_step,
@@ -207,7 +209,7 @@ class GANTrainer(object):
             ops = [self.D.loss,self.summary_op, self.d_train_op]
             d_loss, summary, _ = self.run_gan(self.sess, ops, feed,dropout_prob)
 
-            if not step % self.cfg.g_per_d_train*100 == 0:
+            if not step % (self.cfg.g_per_d_train*10) == 0:
                 continue
             print_msg = "[{}/{}] G_loss: {:.6f} D_loss: {:.6f} ".\
                          format(step, self.cfg.max_step, g_loss, d_loss)
