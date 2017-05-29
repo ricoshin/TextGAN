@@ -10,7 +10,7 @@ from gan_trainer import GANTrainer
 from generator import Generator
 from config import get_config
 from utils import set_logger, prepare_dirs, save_config
-from data import convert_to_token, load_simple_questions_dataset
+from data import load_simple_questions_dataset, load_skt_nugu_sample_dataset
 
 
 def main(config):
@@ -37,6 +37,11 @@ def main(config):
             trainer.test_interactive()
         else:
             trainer.test()
+
+def main_G(config):
+    train, ans2idx, word_embd, word2idx = load_skt_nugu_sample_dataset(config)
+    g_trainer = GTrainer(config, train, None, word_embd, word2idx, ans2idx)
+    g_trainer.train()
 
 if __name__ == "__main__":
     config, unparsed = get_config() # get config from argument parser

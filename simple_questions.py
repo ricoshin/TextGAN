@@ -33,8 +33,11 @@ def load_simple_questions(config, lower=True):
 
             vocab.update(ques_tokens + ans_tokens)
         return questions, answers
+
     with open(os.path.join(data_dir, 'train.txt')) as lines:
         train = parse_file(lines, vocab)
+
     with open(os.path.join(data_dir, 'valid.txt')) as lines:
         valid = parse_file(lines, vocab)
+
     return train, valid, vocab
