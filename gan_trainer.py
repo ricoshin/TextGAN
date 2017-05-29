@@ -37,12 +37,12 @@ class GANTrainer(object):
 
         self.saver = tf.train.Saver()
 
-        pretrain_g_saver = tf.train.Saver()
+        pretrain_g_saver = tf.train.Saver(self.G.vars)
         pretrain_d_saver = tf.train.Saver()
 
         def load_pretrain(sess):
             pretrain_g_saver.restore(sess, self.cfg.g_path)
-            pretrain_d_saver.restore(sess, self.cfg.d_path)
+            # pretrain_d_saver.restore(sess, self.cfg.d_path)
 
         self.writer = tf.summary.FileWriter(self.cfg.model_dir)
 
@@ -50,7 +50,7 @@ class GANTrainer(object):
                                 is_chief=True,
                                 saver=self.saver,
                                 summary_op=None,
-                                #init_fn=load_pretrain,
+                                init_fn=load_pretrain,
                                 #summary_writer=self.summary_writer,
                                 save_model_secs=self.cfg.save_model_secs,
                                 global_step=self.global_step,
@@ -102,7 +102,7 @@ class GANTrainer(object):
         self.G = Generator(word_embd=self.W_e_init,
                            num_answers=len(self.ans2idx),
                            max_ques_len= self.max_sentence_len,
-                           is_pre_train=False,
+                           is_pre_train=True,
                            z_dim=self.cfg.z_dim)
 
         self.D = Discriminator(W_e_init=self.W_e_init,
@@ -165,6 +165,7 @@ class GANTrainer(object):
             self.G.batch_size: batch_size,
             self.G.z: z,
             self.G.answers: np.reshape(answers, [batch_size]),
+            self.G.targets: questions,
             self.D.questions: questions,
             self.D.answers: answers_d,
             self.D.labels: labels,
@@ -207,7 +208,7 @@ class GANTrainer(object):
             ops = [self.D.loss,self.summary_op, self.d_train_op]
             d_loss, summary, _ = self.run_gan(self.sess, ops, feed,dropout_prob)
 
-            if not step % self.cfg.g_per_d_train*100 == 0:
+            if not step % (self.cfg.g_per_d_train*50) == 0:
                 continue
             print_msg = "[{}/{}] G_loss: {:.6f} D_loss: {:.6f} ".\
                          format(step, self.cfg.max_step, g_loss, d_loss)
@@ -215,11 +216,10 @@ class GANTrainer(object):
             self.writer.add_summary(summary, step)
             feed = [que_real, ans_real, label, z_test]
             outputs = self.run_gan(self.sess, self.G.outputs, feed, 1)
-            outputs = np.argmax(outputs, axis=-1)
             answers = [self.idx2ans[ans]
                       for ans in ans_real[:self.cfg.num_samples]]
             from data import convert_to_token
-            outputs = np.array(outputs).transpose()[:self.cfg.num_samples]
+            outputs = np.argmax(outputs[:self.cfg.num_samples], axis=-1)
             outputs = convert_to_token(outputs, self.word2idx)
 
             for ans, ques in zip(answers, outputs):
