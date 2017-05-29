@@ -10,7 +10,7 @@ from gan_trainer import GANTrainer
 from generator import Generator
 from config import get_config
 from utils import set_logger, prepare_dirs, save_config
-from data import load_skt_nugu_sample_dataset
+from data import load_simple_questions_dataset, load_skt_nugu_sample_dataset
 
 
 def main(config):

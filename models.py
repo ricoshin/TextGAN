@@ -44,10 +44,12 @@ class Generator(object):
             # [batch_size, vocab_size]
             hV_1 = tf.matmul(h_1, V)
             # [batch_size]
-            w_1 = tf.argmax(hV_1, axis=1)
+            # w_1 = tf.argmax(hV_1, axis=1)
+            w_1 = tf.nn.softmax(hV_1*10000)
             self.outputs = [w_1]
             # [batch_size, word_embd_size]
-            y_1 = tf.nn.embedding_lookup(word_embd, w_1)
+            # y_1 = tf.nn.embedding_lookup(word_embd, w_1)
+            y_1 = tf.matmul(word_prob, word_embd)
 
             cell = tf.contrib.rnn.LSTMCell(hid_dim)
 
@@ -69,9 +71,11 @@ class Generator(object):
             for t in range(1, max_ques_len):
                 output, state = cell(inputs, state)
                 hV = tf.matmul(output, V)
-                w_t = tf.argmax(hV, axis=1)
+                # w_t = tf.argmax(hV, axis=1)
+                w_t = tf.nn.softmax(hV*10000)
                 self.outputs.append(w_t)
-                y_t = tf.nn.embedding_lookup(word_embd, w_t)
+                # y_t = tf.nn.embedding_lookup(word_embd, w_t)
+                y_t = tf.matmul(word_prob, word_embd)
                 if self.is_pre_train:
                     inputs = tf.nn.embedding_lookup(word_embd,
                                                     self.targets[:, t])
