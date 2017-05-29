@@ -72,7 +72,7 @@ class DTrainer(object):
                                      name='d_lr_update')
         d_optimizer = self.optimizer(self.cfg.d_lr)
 
-        grads_and_vars = d_optimizer.compute_gradients(self.D.loss)
+        grads_and_vars = d_optimizer.compute_gradients(self.D.loss, self.D.vars)
         self.d_train_op = d_optimizer.apply_gradients(grads_and_vars,
                                                    global_step=self.global_step)
 
@@ -100,8 +100,10 @@ class DTrainer(object):
 
 
 
-        train_dataset = Dataset(self.data_train, self.batch_size, self.pad_idx)
-        valid_dataset = Dataset(self.data_valid, self.batch_size, self.pad_idx)
+        train_dataset = Dataset(self.data_train, self.batch_size,
+                                self.vocab_size, self.pad_idx)
+        valid_dataset = Dataset(self.data_valid, self.batch_size,
+                                self.vocab_size, self.pad_idx)
         train_generator = BatchGenerator(train_dataset)
         valid_generator = BatchGenerator(valid_dataset)
 

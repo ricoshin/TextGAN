@@ -2,7 +2,7 @@ import numpy as np
 import random
 
 class Dataset(object):
-    def __init__(self, data, batch_size, pad_idx, shuffle=True):
+    def __init__(self, data, batch_size, num_vocab, pad_idx, shuffle=True):
         self.que = data[0]
         self.ans = data[1]
         self.batch_size = batch_size
@@ -12,11 +12,15 @@ class Dataset(object):
         self.current_batch_que = None
         self.current_batch_ans = None
         self.pad_idx = pad_idx
+        self.num_vocab = num_vocab
 
     def __random_shuffle(self):
         idx = np.random.permutation(self.length)
         self.que = self.que[idx]
         self.ans = self.ans[idx]
+
+    def __dense_to_onehot_batch(self, batch):
+        return (np.arange(self.num_vocab) == batch[:,:,None]).astype(int)
 
     def set_next_batch(self):
         under = self.batch_idx
@@ -33,7 +37,7 @@ class Dataset(object):
             batch_que = np.concatenate((self.que[under:max], self.que[0:rest]))
             batch_ans = np.concatenate((self.ans[under:max], self.ans[0:rest]))
             under = rest
-        self.current_batch_que = batch_que
+        self.current_batch_que = self.__dense_to_onehot_batch(batch_que)
         self.current_batch_ans = batch_ans
         self.batch_idx = under
 
@@ -87,6 +91,7 @@ class BatchGenerator(object):
 
     def get_gan_data_batch(self):
         self.dataset.set_next_batch()
+        self.dataset.current_batch_que
         return self.dataset.current_batch_que, self.dataset.current_batch_ans
 
     def get_gan_label_batch(self):
@@ -94,3 +99,11 @@ class BatchGenerator(object):
         label_real = self.dense_to_onehot(np.ones(batch_size, dtype=np.int), 2)
         label_fake = self.dense_to_onehot(np.zeros(batch_size, dtype=np.int), 2)
         return np.concatenate((label_real, label_fake))
+
+    def get_binary_label_batch(self, is_true):
+        batch_size = self.dataset.batch_size
+        if is_true:
+            label = self.dense_to_onehot(np.ones(batch_size, dtype=np.int), 2)
+        else:
+            label = self.dense_to_onehot(np.zeros(batch_size, dtype=np.int), 2)
+        return label

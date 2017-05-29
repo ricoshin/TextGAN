@@ -15,7 +15,7 @@ parser = argparse.ArgumentParser()
         #  self, W_e_init, max_sentence_len, num_classes, vocab_size,
         #  embedding_size, filter_sizes, num_filters, data_format, l2_reg_lambda=0.0
 settings_arg = add_argument_group('settings')
-settings_arg.add_argument('--dataset', type=str, default='mydataset')
+settings_arg.add_argument('--dataset', type=str, default='nugu')
 settings_arg.add_argument('--is_train', type=str2bool, default=True)
 settings_arg.add_argument('--trainer_mode', type=str, choices=['D','G','GAN'], default='GAN')
 settings_arg.add_argument('--interactive', type=str2bool, default=True)
@@ -26,19 +26,19 @@ settings_arg.add_argument('--early_stopping_threshold', type=int, default=0.001)
 settings_arg.add_argument('--use_gpu', type=str2bool, default=True)
 settings_arg.add_argument('--save_step', type=int, default=5000)
 settings_arg.add_argument('--valid_step', type=int, default=100)
-settings_arg.add_argument('--log_step', type=int, default=50)
+settings_arg.add_argument('--log_step', type=int, default=25)
 settings_arg.add_argument('--max_step', type=int, default=1000000)
 settings_arg.add_argument('--save_model_secs', type=int, default=60)
 settings_arg.add_argument('--g_per_d_train', type=int, default=5)
-settings_arg.add_argument('--num_samples', type=int, default=5)
+settings_arg.add_argument('--num_samples', type=int, default=6)
 
 file_paths_arg = add_argument_group('file_paths')
 file_paths_arg.add_argument('--load_path', type=str, default='')
 file_paths_arg.add_argument('--log_level', type=str, default='INFO', choices=['INFO', 'DEBUG', 'WARN'])
 file_paths_arg.add_argument('--log_dir', type=str, default='logs') #
 file_paths_arg.add_argument('--data_dir', type=str, default='data')
-file_paths_arg.add_argument('--d_path', type=str, default='')
-file_paths_arg.add_argument('--g_path', type=str, default='logs/generator')
+file_paths_arg.add_argument('--d_path', type=str, default='./logs/discriminator')
+file_paths_arg.add_argument('--g_path', type=str, default='./logs/generator')
 
 
 hyper_params_arg = add_argument_group('hyper_params')

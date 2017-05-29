@@ -6,44 +6,40 @@ class Discriminator(object):
 
     def __init__(self, W_e_init, max_sentence_len, num_classes, vocab_size,
                  embedding_size, filter_sizes, num_filters, data_format,
-                 que_fake=None, l2_reg_lambda=0.0):
-        with tf.variable_scope("D") as vs:
+                 l2_reg_lambda=0.0, que_fake=None, reuse=False):
+        with tf.variable_scope("D", reuse=reuse) as vs:
             # Placeholders for input, output and dropout
-            x_dim = [None, max_sentence_len]
+            x_dim = [None, max_sentence_len, vocab_size]
             y_dim = [None, num_classes]
             # self.questions = tf.concat([self.que_real, que_fake],axis=0)
-            self.questions = tf.placeholder(tf.int32, x_dim, name="input_x")
-            self.labels = tf.placeholder(tf.float32, y_dim, name="input_y")
+            if que_fake is None:
+                self.questions = tf.placeholder(tf.float32, x_dim, name="que")
+            else:
+                self.questions = que_fake
+            self.labels = tf.placeholder(tf.float32, y_dim, name="label")
             self.answers = tf.placeholder(tf.int32, [None, 1],
-                                          name="condition")
+                                          name="ans")
             self.dropout_prob = tf.placeholder(tf.float32, name="dropout_prob")
             self.W_e = tf.Variable(W_e_init, name="W_e", dtype=tf.float32)
+            self.is_pre_train = tf.placeholder(tf.bool, name="is_pre_train")
             # Keeping track of l2 regularization loss (optional)
             l2_loss = tf.constant(0.0)
 
             # Embedding layer
             with tf.name_scope("embedding"):
-                embed_real = tf.nn.embedding_lookup(self.W_e, self.questions)
-                if que_fake is not None:
-                    h = embedding_size
-                    v = vocab_size
-                    m = max_sentence_len
+                h = embedding_size
+                v = vocab_size
+                m = max_sentence_len
 
-                    # que_onehot = tf.one_hot(self.questions,depth=vocab_size,axis=-1)
-                    que_fake = tf.reshape(que_fake, [-1, v])
-                    embed_fake = tf.matmul(que_fake, self.W_e)
-                    embed_fake = tf.reshape(embed_fake, [-1, m ,h])
-                    embed = tf.concat([embed_real, embed_fake], axis=0)
-                else:
-                    embed = embed_real
-
+                # que_onehot = tf.one_hot(self.questions,depth=vocab_size,axis=-1)
+                questions = tf.reshape(self.questions, [-1, v])
+                embed = tf.matmul(questions, self.W_e, a_is_sparse=True)
+                embed = tf.reshape(embed, [-1, m ,h])
                 self.embed_expanded = tf.expand_dims(embed, 1)
                 # [batch_size, max_sentence_len, embedding_size]
                 # self.embed_expanded = tf.expand_dims(self.embed, 1)
                 # [batch_size, 1, max_sentence_len, embedding_size]
                 # expand the channel dimension for conv2d operation
-
-                #self.embed = tf.concat(embed_list, axis=0)
 
             # Create a convolution + maxpool layer for each filter size
             pooled_outputs = []
@@ -130,10 +126,12 @@ class Discriminator(object):
     def run(self, sess, ops, feed_list, dropout_prob):
         """feed_list = list([quenstion, answer, label])"""
         questions, answers, labels = feed_list
+        answers = np.reshape(answers, [len(answers), 1])
         feed_dict = {
             self.questions: questions,
             self.answers: answers,
             self.labels: labels,
-            self.dropout_prob: dropout_prob
+            self.dropout_prob: dropout_prob,
+            self.is_pre_train: True,
         }
         return sess.run(ops, feed_dict)
