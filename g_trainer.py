@@ -1,7 +1,5 @@
 from __future__ import print_function
 
-import os
-
 import numpy as np
 import tensorflow as tf
 
@@ -31,13 +29,16 @@ class GTrainer(object):
             yield batch_ques, batch_ans, z
 
     def train(self):
-        sess = tf.Session()
+        if self.config.optimizer == 'adam':
+            self.optimizer = tf.train.AdamOptimizer
+        else:
+            raise Exception("Not supported optimizer:", self.config.optimizer)
 
-        opt = tf.train.AdamOptimizer(1e-4)
+        opt = tf.train.AdamOptimizer(self.config.g_lr)
         train_op = opt.minimize(self.generator.pre_train_loss)
 
-        logdir = os.path.join(self.config.log_dir, 'generator')
-        sv = tf.train.Supervisor(logdir=logdir, save_model_secs=5)
+        sv = tf.train.Supervisor(logdir=self.config.g_path,
+                                 save_model_secs=self.config.save_model_secs)
         with sv.managed_session() as sess:
             for i, batch in enumerate(
                              self.random_batch_generator(self.train_data,
@@ -46,20 +47,18 @@ class GTrainer(object):
                 if sv.should_stop():
                     break
                 questions, answers, z = batch
-                result = self.generator.pre_train(sess, train_op, z, answers,
-                                                  questions)
-                outputs = result[0]
-                loss = result[1]
+                outputs, loss, _ = self.generator.run(sess, train_op, z,
+                                                      answers, questions)
 
-                if i % 100 == 0:
+                if i % self.config.log_step == 0:
                     print('')
                     print('Step', i)
                     print('loss:', loss)
-                    sample_size = 20
-                    outputs = np.array(outputs).transpose()[:sample_size]
+                    outputs = np.argmax(outputs[:self.config.num_samples],
+                                        axis=-1)
                     outputs = convert_to_token(outputs, self.word2idx)
-                    inputs = answers[:sample_size]
+                    inputs = answers[:self.config.num_samples]
                     inputs = [self.idx2ans[ans]
-                              for ans in answers[:sample_size]]
+                              for ans in answers[:self.config.num_samples]]
                     for ans, ques in zip(inputs, outputs):
                         print('%20s => %s' % (ans, ' '.join(ques)))

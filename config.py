@@ -38,7 +38,7 @@ file_paths_arg.add_argument('--log_level', type=str, default='INFO', choices=['I
 file_paths_arg.add_argument('--log_dir', type=str, default='logs') #
 file_paths_arg.add_argument('--data_dir', type=str, default='data')
 file_paths_arg.add_argument('--d_path', type=str, default='')
-file_paths_arg.add_argument('--g_path', type=str, default='')
+file_paths_arg.add_argument('--g_path', type=str, default='logs/generator')
 
 
 hyper_params_arg = add_argument_group('hyper_params')
@@ -50,7 +50,7 @@ hyper_params_arg.add_argument('--d_l2_reg_lambda', type=float, default=0)
 
 hyper_params_arg.add_argument('--optimizer', type=str, default='adam')
 hyper_params_arg.add_argument('--d_lr', type=float, default=0.00002) # learning rate of Discriminator
-hyper_params_arg.add_argument('--g_lr', type=float, default=0.00002) # learning rate of Generator
+hyper_params_arg.add_argument('--g_lr', type=float, default=1e-3) # learning rate of Generator
 hyper_params_arg.add_argument('--lr_update_step', type=int, default=100000, choices=[100000, 75000])
 
 def get_config(): # when program get started, this function runs for the first.
