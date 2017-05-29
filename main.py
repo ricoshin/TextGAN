@@ -44,4 +44,3 @@ def main_G(config):
 if __name__ == "__main__":
     config, unparsed = get_config()  # get config from argument parser
     main(config)
-    # main_G(config)

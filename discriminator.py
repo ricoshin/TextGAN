@@ -1,6 +1,7 @@
 import tensorflow as tf
 from utils import *
 
+
 class Discriminator(object):
 
     def __init__(self, W_e_init, max_sentence_len, num_classes, vocab_size,
@@ -10,10 +11,11 @@ class Discriminator(object):
             # Placeholders for input, output and dropout
             x_dim = [None, max_sentence_len]
             y_dim = [None, num_classes]
-                #self.questions = tf.concat([self.que_real, que_fake],axis=0)
+            # self.questions = tf.concat([self.que_real, que_fake],axis=0)
             self.questions = tf.placeholder(tf.int32, x_dim, name="input_x")
             self.labels = tf.placeholder(tf.float32, y_dim, name="input_y")
-            self.answers = tf.placeholder(tf.int32,[None,1],name="condition")
+            self.answers = tf.placeholder(tf.int32, [None, 1],
+                                          name="condition")
             self.dropout_prob = tf.placeholder(tf.float32, name="dropout_prob")
             self.W_e = tf.Variable(W_e_init, name="W_e", dtype=tf.float32)
             # Keeping track of l2 regularization loss (optional)
@@ -26,8 +28,8 @@ class Discriminator(object):
                     h = embedding_size
                     v = vocab_size
                     m = max_sentence_len
-                    
-                    #que_onehot = tf.one_hot(self.questions,depth=vocab_size,axis=-1)
+
+                    # que_onehot = tf.one_hot(self.questions,depth=vocab_size,axis=-1)
                     que_fake = tf.reshape(que_fake, [-1, v])
                     embed_fake = tf.matmul(que_fake, self.W_e)
                     embed_fake = tf.reshape(embed_fake, [-1, m ,h])
