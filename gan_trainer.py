@@ -18,7 +18,6 @@ class GANTrainer(object):
                  ans2idx):
 
         self.cfg = config
-        self.batch_size = config.batch_size
         self.data_train = train_data
         self.data_valid = valid_data
 
@@ -163,7 +162,7 @@ class GANTrainer(object):
             self.G.batch_size: batch_size,
             self.G.z: z,
             self.G.answers: answers_g,
-            self.G.targets: np.argmax(questions, axis=2), # *NOTE* fix this later too
+            self.G.targets: np.argmax(questions, axis=-1),
             self.D_real.questions: questions,
             self.D_real.answers: answers_d,
             self.D_real.labels: labels_real,
@@ -190,8 +189,8 @@ class GANTrainer(object):
         dropout_prob = self.cfg.d_dropout_prob
         pbar = tqdm(total = self.cfg.max_step)
         step = self.sess.run(self.global_step)
-        z_test = np.random.uniform(-1, 1,[self.batch_size, self.cfg.z_dim])
-        #ans_test = np.asarray([ 3,3,1,1,2,2 ]) # len(ans_cls) : total test batch size
+
+        z_test = np.random.uniform(-1, 1,[self.cfg.batch_size, self.cfg.z_dim])
 
         if step > 1:
             pbar.update(step)
