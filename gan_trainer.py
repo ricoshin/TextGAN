@@ -231,9 +231,17 @@ class GANTrainer(object):
                 raise Exception('Unsupported dataset:', self.cfg.dataset)
 
 
-    def _print_simque_samples(self, z_test):
-        print('Simque sample')
+    def _print_simque_samples(self, feed):
+        outputs = self.run_gan(self.sess, self.G.outputs, feed)
+        outputs = np.argmax(outputs[:self.cfg.num_samples], axis=-1)
+        outputs = convert_to_token(outputs, self.word2idx)
 
+        ans_real = feed[1]
+        answers = convert_to_token(ans_real[:self.cfg.num_samples],
+                                   self.word2idx)[0]
+
+        for ans, ques in zip(answers, outputs):
+            print('%20s => %s' % (ans, ' '.join(ques)))
 
     def _print_nugu_samples(self, z_test):
         feed = [que_real, ans_real, z_test, 1]
