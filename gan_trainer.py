@@ -70,8 +70,8 @@ class GANTrainer(object):
 
     def compute_generator_loss_tmp(self, feature_real, feature_fake):
 
-        #feature_real = d_feature[0:self.batch_size]
-        #feature_fake = d_feature[self.batch_size:]
+        #feature_real = d_feature[0:self.cfg.batch_size]
+        #feature_fake = d_feature[self.cfg.batch_size:]
         return tf.reduce_mean(tf.square(tf.subtract(feature_real,feature_fake)))
 
     def build_model(self):
@@ -80,8 +80,8 @@ class GANTrainer(object):
         is_onehot = True if self.cfg.dataset == 'nugu' else False
         self.G = Generator(word_embd=self.W_e_init,
                            ans2idx=self.ans2idx,
-                           max_ques_len= self.max_sentence_len,
-                           is_pre_train=True,
+                           max_ques_len=self.max_sentence_len,
+                           is_pre_train=False,
                            is_onehot=is_onehot,
                            z_dim=self.cfg.z_dim)
 
@@ -181,7 +181,7 @@ class GANTrainer(object):
         from data_loader import Dataset
         from data_loader import BatchGenerator
 
-        train_dataset = Dataset(self.data_train, self.batch_size,
+        train_dataset = Dataset(self.data_train, self.cfg.batch_size,
                                 self.vocab_size, self.pad_idx)
         train_generator = BatchGenerator(train_dataset)
         self.label_real = train_generator.get_binary_label_batch(True)
@@ -201,7 +201,7 @@ class GANTrainer(object):
             que_real, ans_real = train_generator.get_gan_data_batch()
 
             # G train
-            z = np.random.uniform(-1, 1, [self.batch_size, self.cfg.z_dim])
+            z = np.random.uniform(-1, 1, [self.cfg.batch_size, self.cfg.z_dim])
             feed = [que_real, ans_real, z, 1]
             ops = [self.global_step, self.g_loss, self.g_train_op]
             step, g_loss, _ = self.run_gan(self.sess, ops, feed)
@@ -209,7 +209,7 @@ class GANTrainer(object):
             # D train
             if not step % self.cfg.g_per_d_train == 0:
                 continue
-            z = np.random.uniform(-1, 1, [self.batch_size, self.cfg.z_dim])
+            z = np.random.uniform(-1, 1, [self.cfg.batch_size, self.cfg.z_dim])
             feed = [que_real, ans_real, z, dropout_prob]
             ops = [self.d_loss,self.summary_op, self.d_train_op]
             d_loss, summary, _ = self.run_gan(self.sess, ops, feed)
@@ -223,10 +223,11 @@ class GANTrainer(object):
             self.writer.add_summary(summary, step)
 
             # print generated samples
+            feed = [que_real, ans_real, z_test, 1]
             if self.cfg.dataset == 'nugu':
-                self._print_nugu_samples(z_test)
+                self._print_nugu_samples(feed)
             elif self.cfg.dataset == 'simque':
-                self._print_simque_samples(z_test)
+                self._print_simque_samples(feed)
             else:
                 raise Exception('Unsupported dataset:', self.cfg.dataset)
 
@@ -243,8 +244,8 @@ class GANTrainer(object):
         for ans, ques in zip(answers, outputs):
             print('%20s => %s' % (ans, ' '.join(ques)))
 
-    def _print_nugu_samples(self, z_test):
-        feed = [que_real, ans_real, z_test, 1]
+    def _print_nugu_samples(self, feed):
+        ans_real = feed[1]
         outputs = self.run_gan(self.sess, self.G.outputs, feed)
         answers = [self.idx2ans[ans]
                    for ans in ans_real[:self.cfg.num_samples]]

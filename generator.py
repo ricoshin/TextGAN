@@ -19,10 +19,9 @@ class Generator(object):
             self.answers = tf.placeholder(tf.int32,
                                           shape=[None],
                                           name='answers')
-            if self.is_pre_train:
-                self.targets = tf.placeholder(tf.int32,
-                                              shape=[None, max_ques_len],
-                                              name='targets')
+            self.targets = tf.placeholder(tf.int32,
+                                          shape=[None, max_ques_len],
+                                          name='targets')
             V = tf.Variable(tf.random_normal([hid_dim, vocab_size]), name='V')
 
             if is_onehot:
@@ -111,9 +110,4 @@ class Generator(object):
             self.answers: np.reshape(answers, [batch_size]),
             self.targets: targets,
         }
-        if self.is_pre_train:
-            return sess.run([self.outputs, self.pre_train_loss, train_op],
-                            feed_dict)
-        else:
-            outputs = sess.run(self.outputs, feed_dict)
-        return outputs
+        return sess.run([self.outputs, self.pre_train_loss, train_op], feed_dict)
