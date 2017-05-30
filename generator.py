@@ -3,9 +3,11 @@ import tensorflow as tf
 
 
 class Generator(object):
-    def __init__(self, word_embd, max_ques_len, num_answers, is_pre_train,
-                 z_dim=100, hid_dim=100):
+    def __init__(self, word_embd, max_ques_len, ans2idx, is_pre_train,
+                 is_onehot, z_dim=100, hid_dim=100):
         self.is_pre_train = is_pre_train
+        if is_onehot:
+            num_classes = len(ans2idx)
         with tf.variable_scope('G') as vs:
             self.batch_size = tf.placeholder(tf.int32, [], name='batch_size')
             word_embd = tf.Variable(word_embd, name='word_embd',
@@ -23,21 +25,25 @@ class Generator(object):
                                               name='targets')
             V = tf.Variable(tf.random_normal([hid_dim, vocab_size]), name='V')
 
-            # C = tf.Variable(tf.random_normal([z_dim+word_embd_size, hid_dim]),
-            #                 name='C')
-            C = tf.Variable(tf.random_normal([z_dim+num_answers, hid_dim]),
-                            name='C')
+            if is_onehot:
+                C = tf.Variable(tf.random_normal([z_dim+num_classes, hid_dim]),
+                                name='C')
+            else:
+                C = tf.Variable(tf.random_normal([z_dim+word_embd_size,
+                                                  hid_dim]),
+                                name='C')
 
-            # # [batch_size, word_embd_size]
-            # ans_embd = tf.nn.embedding_lookup(word_embd, self.answers,
-            #                                   name='ans_embd')
-            # # [batch_size, z_dim + word_embd_size]
-            # za = tf.concat([self.z, ans_embd], axis=1, name='za')
-
-            # [batch_size, num_answers]
-            ans_onehot = tf.one_hot(self.answers, num_answers, axis=-1)
-            # [batch_size, z_dim + num_answers]
-            za = tf.concat([self.z, ans_onehot], axis=1, name='za')
+            if is_onehot:
+                # [batch_size, num_classes]
+                ans_onehot = tf.one_hot(self.answers, num_classes, axis=-1)
+                # [batch_size, z_dim + num_classes]
+                za = tf.concat([self.z, ans_onehot], axis=1, name='za')
+            else:
+                # [batch_size, word_embd_size]
+                ans_embd = tf.nn.embedding_lookup(word_embd, self.answers,
+                                                  name='ans_embd')
+                # [batch_size, z_dim + word_embd_size]
+                za = tf.concat([self.z, ans_embd], axis=1, name='za')
 
             # [batch_size, hid_dim]
             h_1 = tf.matmul(za, C)
@@ -79,7 +85,6 @@ class Generator(object):
                 self.outputs.append(w_t)
                 # y_t = tf.nn.embedding_lookup(word_embd, w_t)
                 y_t = tf.matmul(w_t, word_embd)
-
 
                 if self.is_pre_train:
                     inputs = tf.nn.embedding_lookup(word_embd,

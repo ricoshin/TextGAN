@@ -5,7 +5,7 @@ from g_trainer import GTrainer
 from gan_trainer import GANTrainer
 from config import get_config
 from utils import set_logger, prepare_dirs, save_config
-from data import load_skt_nugu_sample_dataset
+from data import load_skt_nugu_sample_dataset, load_simple_questions_dataset
 
 
 def main(config):
@@ -14,14 +14,22 @@ def main(config):
 
     """ NOTE : should fix problems when valid mode is on """
     # get trainer instance
-    train, ans2idx, W_e_init, word2idx = load_skt_nugu_sample_dataset(config)
+    if config.dataset == 'nugu':
+        train, ans2idx, W_e_init, word2idx = load_skt_nugu_sample_dataset(config)
+        valid = train
+    elif config.dataset == 'simque':
+        train, valid, W_e_init, word2idx = load_simple_questions_dataset(config)
+        ans2idx = None
+    else:
+        raise Exception('Unsupported dataset:', config.dataset)
+
     # data, W_e_init, word2idx = 0,0,0
     if config.trainer_mode == "G":
-        trainer = GTrainer(config, train, None, W_e_init, word2idx, ans2idx)
+        trainer = GTrainer(config, train, valid, W_e_init, word2idx, ans2idx)
     elif config.trainer_mode == "D":
-        trainer = DTrainer(config, train, train, W_e_init, word2idx)
+        trainer = DTrainer(config, train, valid, W_e_init, word2idx)
     else:  # config.trainer_mode == "GAN":
-        trainer = GANTrainer(config, train, train, W_e_init, word2idx, ans2idx)
+        trainer = GANTrainer(config, train, valid, W_e_init, word2idx, ans2idx)
 
     if config.is_train:
         save_config(config)  # save config file(params.json)

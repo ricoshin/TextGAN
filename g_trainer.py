@@ -12,12 +12,16 @@ class GTrainer(object):
         self.train_data = train
         self.valid_data = valid
         self.word2idx = word2idx
-        self.idx2ans = {v: k for k, v in ans2idx.items()}
+        if ans2idx is not None:
+            self.idx2ans = {v: k for k, v in ans2idx.items()}
         self.num_examples = train[0].shape[0]
         self.max_sent_len = train[0].shape[1]
         self.config = config
-        self.generator = Generator(word_embd, self.max_sent_len, len(ans2idx),
-                                   True, z_dim=self.config.z_dim)
+        is_onehot = True if config.dataset == 'nugu' else False
+        self.generator = Generator(word_embd, self.max_sent_len, ans2idx,
+                                   is_pre_train=True,
+                                   is_onehot=is_onehot,
+                                   z_dim=self.config.z_dim)
 
     def random_batch_generator(self, data, batch_size, num_steps):
         for i in range(num_steps):
@@ -32,7 +36,7 @@ class GTrainer(object):
         if self.config.optimizer == 'adam':
             self.optimizer = tf.train.AdamOptimizer
         else:
-            raise Exception("Not supported optimizer:", self.config.optimizer)
+            raise Exception("Unsupported optimizer:", self.config.optimizer)
 
         opt = tf.train.AdamOptimizer(self.config.g_lr)
         train_op = opt.minimize(self.generator.pre_train_loss)
@@ -50,15 +54,35 @@ class GTrainer(object):
                 outputs, loss, _ = self.generator.run(sess, train_op, z,
                                                       answers, questions)
 
-                if i % self.config.log_step == 0:
-                    print('')
-                    print('Step', i)
-                    print('loss:', loss)
-                    outputs = np.argmax(outputs[:self.config.num_samples],
-                                        axis=-1)
-                    outputs = convert_to_token(outputs, self.word2idx)
-                    inputs = answers[:self.config.num_samples]
-                    inputs = [self.idx2ans[ans]
-                              for ans in answers[:self.config.num_samples]]
-                    for ans, ques in zip(inputs, outputs):
-                        print('%20s => %s' % (ans, ' '.join(ques)))
+                if i % self.config.log_step != 0:
+                    continue
+
+                print('')
+                print('Step', i)
+                print('loss:', loss)
+                if self.config.dataset == 'nugu':
+                    self._print_nugu_samples(outputs, answers)
+                elif self.config.dataset == 'simque':
+                    self._print_simque_samples(outputs, answers)
+                else:
+                    print('No samples for', self.config.dataset)
+
+    def _print_nugu_samples(self, outputs, answers):
+        outputs = np.argmax(outputs[:self.config.num_samples],
+                            axis=-1)
+        outputs = convert_to_token(outputs, self.word2idx)
+        inputs = answers[:self.config.num_samples]
+        inputs = [self.idx2ans[ans]
+                  for ans in answers[:self.config.num_samples]]
+        for ans, ques in zip(inputs, outputs):
+            print('%20s => %s' % (ans, ' '.join(ques)))
+
+    def _print_simque_samples(self, outputs, answers):
+        outputs = np.argmax(outputs[:self.config.num_samples],
+                            axis=-1)
+        outputs = convert_to_token(outputs, self.word2idx)
+
+        inputs = answers[:self.config.num_samples]
+        inputs = convert_to_token([inputs], self.word2idx)[0]
+        for ans, ques in zip(inputs, outputs):
+            print('%20s => %s' % (ans, ' '.join(ques)))

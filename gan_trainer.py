@@ -1,6 +1,5 @@
 from __future__ import print_function
 
-import os
 import numpy as np
 #from tqdm import trange
 from tqdm import tqdm
@@ -9,7 +8,7 @@ from utils import *
 import tensorflow as tf
 from discriminator import Discriminator
 from generator import Generator
-from data import TOK_PAD
+from data import TOK_PAD, convert_to_token
 import random
 
 
@@ -25,7 +24,8 @@ class GANTrainer(object):
         self.W_e_init = np.asarray(W_e_init)
         self.word2idx = word2idx
         self.ans2idx = ans2idx
-        self.idx2ans = {v: k for k, v in ans2idx.items()}
+        if ans2idx != None:
+            self.idx2ans = {v: k for k, v in ans2idx.items()}
         self.pad_idx = word2idx[TOK_PAD]
         self.max_sentence_len = np.asarray(train_data[0]).shape[1]
         self.vocab_size = self.W_e_init.shape[0]
@@ -102,10 +102,12 @@ class GANTrainer(object):
     def build_model(self):
         #  self, W_e_init, max_sentence_len, num_classes, vocab_size,
         #  embedding_size, filter_sizes, num_filters, data_format, l2_reg_lambda=0.0
+        is_onehot = True if self.cfg.dataset == 'nugu' else False
         self.G = Generator(word_embd=self.W_e_init,
-                           num_answers=len(self.ans2idx),
+                           ans2idx=self.ans2idx,
                            max_ques_len= self.max_sentence_len,
                            is_pre_train=True,
+                           is_onehot=is_onehot,
                            z_dim=self.cfg.z_dim)
 
         self.D_fake = Discriminator(W_e_init=self.W_e_init,
@@ -198,7 +200,6 @@ class GANTrainer(object):
         return sess.run(ops, feed_dict)
 
 
-
     def train(self):
 
         from data_loader import Dataset
@@ -243,14 +244,27 @@ class GANTrainer(object):
                          format(step, self.cfg.max_step, g_loss, d_loss)
             print(print_msg)
             self.writer.add_summary(summary, step)
-            # print generated samples
-            feed = [que_real, ans_real, z_test, 1]
-            outputs = self.run_gan(self.sess, self.G.outputs, feed)
-            answers = [self.idx2ans[ans]
-                       for ans in ans_real[:self.cfg.num_samples]]
-            from data import convert_to_token
-            outputs = np.argmax(outputs[:self.cfg.num_samples], axis=-1)
-            outputs = convert_to_token(outputs, self.word2idx)
 
-            for ans, ques in zip(answers, outputs):
-                print('%20s => %s' % (ans, ' '.join(ques)))
+            # print generated samples
+            if self.cfg.dataset == 'nugu':
+                self._print_nugu_samples(z_test)
+            elif self.cfg.dataset == 'simque':
+                self._print_simque_samples(z_test)
+            else:
+                raise Exception('Unsupported dataset:', self.cfg.dataset)
+
+
+    def _print_simque_samples(self, z_test):
+        print('Simque sample')
+
+
+    def _print_nugu_samples(self, z_test):
+        feed = [que_real, ans_real, z_test, 1]
+        outputs = self.run_gan(self.sess, self.G.outputs, feed)
+        answers = [self.idx2ans[ans]
+                   for ans in ans_real[:self.cfg.num_samples]]
+        outputs = np.argmax(outputs[:self.cfg.num_samples], axis=-1)
+        outputs = convert_to_token(outputs, self.word2idx)
+
+        for ans, ques in zip(answers, outputs):
+            print('%20s => %s' % (ans, ' '.join(ques)))

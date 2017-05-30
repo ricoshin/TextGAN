@@ -15,7 +15,7 @@ parser = argparse.ArgumentParser()
         #  self, W_e_init, max_sentence_len, num_classes, vocab_size,
         #  embedding_size, filter_sizes, num_filters, data_format, l2_reg_lambda=0.0
 settings_arg = add_argument_group('settings')
-settings_arg.add_argument('--dataset', type=str, default='nugu')
+settings_arg.add_argument('--dataset', type=str, choices=['nugu', 'simque'])
 settings_arg.add_argument('--is_train', type=str2bool, default=True)
 settings_arg.add_argument('--trainer_mode', type=str, choices=['D','G','GAN'], default='GAN')
 settings_arg.add_argument('--interactive', type=str2bool, default=True)
@@ -50,7 +50,7 @@ hyper_params_arg.add_argument('--d_l2_reg_lambda', type=float, default=0)
 
 hyper_params_arg.add_argument('--optimizer', type=str, default='adam')
 hyper_params_arg.add_argument('--d_lr', type=float, default=0.00002) # learning rate of Discriminator
-hyper_params_arg.add_argument('--g_lr', type=float, default=1e-3) # learning rate of Generator
+hyper_params_arg.add_argument('--g_lr', type=float, default=1e-2) # learning rate of Generator
 hyper_params_arg.add_argument('--lr_update_step', type=int, default=100000, choices=[100000, 75000])
 
 def get_config(): # when program get started, this function runs for the first.
