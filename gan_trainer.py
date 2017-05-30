@@ -66,32 +66,8 @@ class GANTrainer(object):
         self.sess = self.sv.prepare_or_wait_for_session(config=sess_config)
 
 
-    def compute_generator_loss(self, d_feature):
-
-        from numpy import cov
-        from numpy.linalg import inv
-        from numpy import trace
-        from numpy import matmul
-        from numpy import transpose as trans
-        import pdb; pdb.set_trace()
-
-        def cov(a, b):
-            x = tf.concat([a,b], axis=0)
-            x -= x.reduce_mean(axis=0)
-            fact = a.shape[1] - 1
-            pass
-
-        feature_real = d_feature[0:self.batch_size]
-        feature_fake = d_feature[self.batch_size:]
-        mean_r = tf.reduce_mean(feature_real, axis=1)
-        mean_s = tf.reduce_mean(feature_fake, axis=1)
-        cov_r, cov_s = cov(feature_real), cov(feature_fake)
-
-        term_1 = trace(matmul(inv(cov_s),cov_r)+matmul(inv(cov_r),cov_s))
-        term_2_1 = matmul(trans(mean_s-mean_r),inv(cov_s)+inv(cov_r))
-        term_2_2 = matmul(term_2_1,mean_s-mean_r)
-        g_loss = term_1 + term_2_2
-        return g_loss
+    def compute_generator_loss(self, feature_real, feature_fake):
+        pass
 
     def compute_generator_loss_tmp(self, feature_real, feature_fake):
 
@@ -130,6 +106,7 @@ class GANTrainer(object):
                                     l2_reg_lambda=self.cfg.d_l2_reg_lambda,
                                     que_fake=None,
                                     reuse=True)
+
 
         self.g_loss = self.compute_generator_loss_tmp(self.D_real.feature,
                                                       self.D_fake.feature)#D.feature)
@@ -186,7 +163,7 @@ class GANTrainer(object):
             self.G.batch_size: batch_size,
             self.G.z: z,
             self.G.answers: answers_g,
-            self.G.targets: questions,
+            self.G.targets: np.argmax(questions, axis=2), # *NOTE* fix this later too
             self.D_real.questions: questions,
             self.D_real.answers: answers_d,
             self.D_real.labels: labels_real,
@@ -213,7 +190,8 @@ class GANTrainer(object):
         dropout_prob = self.cfg.d_dropout_prob
         pbar = tqdm(total = self.cfg.max_step)
         step = self.sess.run(self.global_step)
-        z_test = np.random.uniform(-1, 1,[self.cfg.num_samples, self.cfg.z_dim])
+        z_test = np.random.uniform(-1, 1,[self.batch_size, self.cfg.z_dim])
+        #ans_test = np.asarray([ 3,3,1,1,2,2 ]) # len(ans_cls) : total test batch size
 
         if step > 1:
             pbar.update(step)
@@ -224,7 +202,7 @@ class GANTrainer(object):
 
             # G train
             z = np.random.uniform(-1, 1, [self.batch_size, self.cfg.z_dim])
-            feed = [que_real, ans_real, z, dropout_prob]
+            feed = [que_real, ans_real, z, 1]
             ops = [self.global_step, self.g_loss, self.g_train_op]
             step, g_loss, _ = self.run_gan(self.sess, ops, feed)
 
@@ -243,13 +221,15 @@ class GANTrainer(object):
                          format(step, self.cfg.max_step, g_loss, d_loss)
             print(print_msg)
             self.writer.add_summary(summary, step)
+
             # print generated samples
-            feed = [que_real, ans_real, z_test, 1]
+            feed = [que_real, ans_real, z, 1]
             outputs = self.run_gan(self.sess, self.G.outputs, feed)
+            outputs = np.argmax(outputs, axis=-1)
             answers = [self.idx2ans[ans]
-                       for ans in ans_real[:self.cfg.num_samples]]
+                      for ans in ans_real[:self.cfg.num_samples]]
             from data import convert_to_token
-            outputs = np.argmax(outputs[:self.cfg.num_samples], axis=-1)
+            outputs = outputs[:self.cfg.num_samples]
             outputs = convert_to_token(outputs, self.word2idx)
 
             for ans, ques in zip(answers, outputs):
