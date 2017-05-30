@@ -67,13 +67,12 @@ class Generator(object):
             if self.is_pre_train:
                 inputs = tf.nn.embedding_lookup(word_embd, self.targets[:, 0])
                 # inputs = tf.stop_gradient(inputs)
-
-                labels = tf.one_hot(self.targets[:, 0], vocab_size, axis=-1)
-                loss = tf.nn.softmax_cross_entropy_with_logits(logits=hV_1,
-                                                               labels=labels)
-                pre_train_losses.append(loss)
             else:
                 inputs = y_1
+            labels = tf.one_hot(self.targets[:, 0], vocab_size, axis=-1)
+            loss = tf.nn.softmax_cross_entropy_with_logits(logits=hV_1,
+                                                           labels=labels)
+            pre_train_losses.append(loss)
 
             for t in range(1, max_ques_len):
                 output, state = cell(inputs, state)
@@ -88,12 +87,13 @@ class Generator(object):
                 if self.is_pre_train:
                     inputs = tf.nn.embedding_lookup(word_embd,
                                                     self.targets[:, t])
-                    labels = tf.one_hot(self.targets[:, t], vocab_size, axis=-1)
-                    loss = tf.nn.softmax_cross_entropy_with_logits(
-                        logits=hV, labels=labels)
-                    pre_train_losses.append(loss)
                 else:
                     inputs = y_t
+                labels = tf.one_hot(self.targets[:, t], vocab_size, axis=-1)
+                loss = tf.nn.softmax_cross_entropy_with_logits(
+                    logits=hV, labels=labels)
+                pre_train_losses.append(loss)
+
                 tf.get_variable_scope().reuse_variables()
             self.outputs = tf.transpose(self.outputs, [1, 0, 2])
             self.pre_train_loss = tf.reduce_mean(pre_train_losses,
@@ -110,4 +110,5 @@ class Generator(object):
             self.answers: np.reshape(answers, [batch_size]),
             self.targets: targets,
         }
-        return sess.run([self.outputs, self.pre_train_loss, train_op], feed_dict)
+        return sess.run([self.outputs, self.pre_train_loss, train_op],
+                        feed_dict)

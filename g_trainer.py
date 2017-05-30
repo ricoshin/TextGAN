@@ -19,7 +19,7 @@ class GTrainer(object):
         self.config = config
         is_onehot = True if config.dataset == 'nugu' else False
         self.generator = Generator(word_embd, self.max_sent_len, ans2idx,
-                                   is_pre_train=True,
+                                   is_pre_train=False,
                                    is_onehot=is_onehot,
                                    z_dim=self.config.z_dim)
 
