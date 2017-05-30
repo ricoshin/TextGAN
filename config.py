@@ -30,7 +30,7 @@ settings_arg.add_argument('--log_step', type=int, default=25)
 settings_arg.add_argument('--max_step', type=int, default=1000000)
 settings_arg.add_argument('--save_model_secs', type=int, default=60)
 settings_arg.add_argument('--g_per_d_train', type=int, default=5)
-settings_arg.add_argument('--num_samples', type=int, default=6)
+settings_arg.add_argument('--num_samples', type=int, default=20)
 
 file_paths_arg = add_argument_group('file_paths')
 file_paths_arg.add_argument('--load_path', type=str, default='')
@@ -50,7 +50,7 @@ hyper_params_arg.add_argument('--d_l2_reg_lambda', type=float, default=0)
 
 hyper_params_arg.add_argument('--optimizer', type=str, default='adam')
 hyper_params_arg.add_argument('--d_lr', type=float, default=0.00002) # learning rate of Discriminator
-hyper_params_arg.add_argument('--g_lr', type=float, default=1e-2) # learning rate of Generator
+hyper_params_arg.add_argument('--g_lr', type=float, default=0.00001) # learning rate of Generator
 hyper_params_arg.add_argument('--lr_update_step', type=int, default=100000, choices=[100000, 75000])
 
 def get_config(): # when program get started, this function runs for the first.

@@ -13,6 +13,7 @@ class Dataset(object):
         self.current_batch_ans = None
         self.pad_idx = pad_idx
         self.num_vocab = num_vocab
+        self.__random_shuffle()
 
     def __random_shuffle(self):
         idx = np.random.permutation(self.length)
@@ -91,7 +92,6 @@ class BatchGenerator(object):
 
     def get_gan_data_batch(self):
         self.dataset.set_next_batch()
-        self.dataset.current_batch_que
         return self.dataset.current_batch_que, self.dataset.current_batch_ans
 
     def get_gan_label_batch(self):
