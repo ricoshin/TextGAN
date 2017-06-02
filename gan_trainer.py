@@ -207,29 +207,34 @@ class GANTrainer(object):
             step, g_loss, _ = self.run_gan(self.sess, ops, feed)
 
             # D train
-            if not step % self.cfg.g_per_d_train == 0:
-                continue
-            z = np.random.uniform(-1, 1, [self.cfg.batch_size, self.cfg.z_dim])
-            feed = [que_real, ans_real, z, dropout_prob]
-            ops = [self.d_loss,self.summary_op, self.d_train_op]
-            d_loss, summary, _ = self.run_gan(self.sess, ops, feed)
+            if step % self.cfg.g_per_d_train == 0:
+                z = np.random.uniform(-1, 1,
+                                      [self.cfg.batch_size, self.cfg.z_dim])
+                feed = [que_real, ans_real, z, dropout_prob]
+                ops = [self.d_loss,self.summary_op, self.d_train_op]
+                d_loss, summary, _ = self.run_gan(self.sess, ops, feed)
 
             # summary & print message
-            if not step % (self.cfg.g_per_d_train*10) == 0:
-                continue
-            print_msg = "[{}/{}] G_loss: {:.6f} D_loss: {:.6f} ".\
-                         format(step, self.cfg.max_step, g_loss, d_loss)
-            print(print_msg)
-            self.writer.add_summary(summary, step)
+            if step % (self.cfg.g_per_d_train*10) == 0:
+                print_msg = "[{}/{}] G_loss: {:.6f} D_loss: {:.6f} ".\
+                             format(step, self.cfg.max_step, g_loss, d_loss)
+                print(print_msg)
+                self.writer.add_summary(summary, step)
 
-            # print generated samples
-            feed = [que_real, ans_real, z_test, 1]
-            if self.cfg.dataset == 'nugu':
-                self._print_nugu_samples(feed)
-            elif self.cfg.dataset == 'simque':
-                self._print_simque_samples(feed)
-            else:
-                raise Exception('Unsupported dataset:', self.cfg.dataset)
+                # print generated samples
+                feed = [que_real, ans_real, z, 1]
+
+                # ans_real.fill(40607)
+                # feed = [que_real[:self.cfg.num_samples],
+                #         ans_real[:self.cfg.num_samples],
+                #         z[:self.cfg.num_samples],
+                #         1]
+                if self.cfg.dataset == 'nugu':
+                    self._print_nugu_samples(feed)
+                elif self.cfg.dataset == 'simque':
+                    self._print_simque_samples(feed)
+                else:
+                    raise Exception('Unsupported dataset:', self.cfg.dataset)
 
 
     def _print_simque_samples(self, feed):
@@ -238,11 +243,11 @@ class GANTrainer(object):
         outputs = convert_to_token(outputs, self.word2idx)
 
         ans_real = feed[1]
-        answers = convert_to_token(ans_real[:self.cfg.num_samples],
-                                   self.word2idx)[0]
+        inputs = convert_to_token(ans_real[:self.cfg.num_samples],
+                                   self.word2idx)
 
-        for ans, ques in zip(answers, outputs):
-            print('%20s => %s' % (ans, ' '.join(ques)))
+        for ans, ques in zip(inputs, outputs):
+            print('%20s => %s' % (ans[0], ' '.join(ques)))
 
     def _print_nugu_samples(self, feed):
         ans_real = feed[1]

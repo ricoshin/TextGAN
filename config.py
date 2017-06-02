@@ -50,7 +50,7 @@ hyper_params_arg.add_argument('--d_l2_reg_lambda', type=float, default=0)
 
 hyper_params_arg.add_argument('--optimizer', type=str, default='adam')
 hyper_params_arg.add_argument('--d_lr', type=float, default=0.00002) # learning rate of Discriminator
-hyper_params_arg.add_argument('--g_lr', type=float, default=0.00001) # learning rate of Generator
+hyper_params_arg.add_argument('--g_lr', type=float, default=0.00005) # learning rate of Generator
 hyper_params_arg.add_argument('--lr_update_step', type=int, default=100000, choices=[100000, 75000])
 
 def get_config(): # when program get started, this function runs for the first.
