@@ -79,7 +79,7 @@ class GANTrainer(object):
                            is_onehot=is_onehot,
                            z_dim=self.cfg.z_dim)
 
-        self.D_fake = Discriminator(W_e_init=self.W_e_init,
+        self.D_fake = Discriminator(word_embd=self.W_e_init,
                                     max_sentence_len=self.max_sentence_len,
                                     num_classes=2,
                                     vocab_size=self.vocab_size,
@@ -90,7 +90,7 @@ class GANTrainer(object):
                                     l2_reg_lambda=self.cfg.d_l2_reg_lambda,
                                     que_fake=self.G.outputs)
 
-        self.D_real = Discriminator(W_e_init=self.W_e_init,
+        self.D_real = Discriminator(word_embd=self.W_e_init,
                                     max_sentence_len=self.max_sentence_len,
                                     num_classes=2,
                                     vocab_size=self.vocab_size,

@@ -48,7 +48,7 @@ class DTrainer(object):
 
     def build_model(self):
 
-        self.D = Discriminator(W_e_init=self.W_e_init,
+        self.D = Discriminator(word_embd=self.W_e_init,
                                max_sentence_len=self.max_sentence_len,
                                num_classes=2,
                                vocab_size=self.vocab_size,
