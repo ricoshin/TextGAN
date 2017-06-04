@@ -1,10 +1,10 @@
+import numpy as np
 import tensorflow as tf
-from utils import *
 
 
 class Discriminator(object):
 
-    def __init__(self, W_e_init, max_sentence_len, num_classes, vocab_size,
+    def __init__(self, word_embd, max_sentence_len, num_classes, vocab_size,
                  embedding_size, filter_sizes, num_filters, data_format,
                  l2_reg_lambda=0.0, que_fake=None, reuse=False):
         with tf.variable_scope("D", reuse=reuse) as vs:
@@ -20,7 +20,7 @@ class Discriminator(object):
             self.answers = tf.placeholder(tf.int32, [None, 1],
                                           name="ans")
             self.dropout_prob = tf.placeholder(tf.float32, name="dropout_prob")
-            self.W_e = tf.Variable(W_e_init, name="W_e", dtype=tf.float32)
+            self.W_e = tf.Variable(word_embd, name="W_e", dtype=tf.float32)
             self.is_pre_train = tf.placeholder(tf.bool, name="is_pre_train")
             # Keeping track of l2 regularization loss (optional)
             l2_loss = tf.constant(0.0)
@@ -28,13 +28,12 @@ class Discriminator(object):
             # Embedding layer
             with tf.name_scope("embedding"):
                 h = embedding_size
-                v = vocab_size
+                V = vocab_size
                 m = max_sentence_len
 
-                # que_onehot = tf.one_hot(self.questions,depth=vocab_size,axis=-1)
-                questions = tf.reshape(self.questions, [-1, v])
+                questions = tf.reshape(self.questions, [-1, V])
                 embed = tf.matmul(questions, self.W_e, a_is_sparse=True)
-                embed = tf.reshape(embed, [-1, m ,h])
+                embed = tf.reshape(embed, [-1, m, h])
                 self.embed_expanded = tf.expand_dims(embed, 1)
                 # [batch_size, max_sentence_len, embedding_size]
                 # self.embed_expanded = tf.expand_dims(self.embed, 1)
@@ -46,7 +45,8 @@ class Discriminator(object):
             for i, filter_size in enumerate(filter_sizes):
                 with tf.name_scope("conv-maxpool-%s" % filter_size):
                     # Convolution Layer
-                    filter_shape = [filter_size, embedding_size, 1, num_filters]
+                    filter_shape = [filter_size, embedding_size, 1,
+                                    num_filters]
                     W = tf.Variable(tf.truncated_normal(
                                     filter_shape, stddev=0.1), name="W")
                     # magnitude is more than 2 standard deviations
@@ -59,9 +59,9 @@ class Discriminator(object):
                                         name="conv",
                                         data_format=data_format)
                     # Apply nonlinearity
-                    h = tf.nn.relu(tf.nn.bias_add(conv, b,
-                                                  data_format=data_format),
-                                                  name="relu")
+                    h = tf.nn.relu(
+                            tf.nn.bias_add(conv, b, data_format=data_format),
+                            name="relu")
                     # [batch_size, 1, max_sentence_len - filter_size + 1, 1]
 
                     # Maxpooling over the outputs
@@ -73,12 +73,12 @@ class Discriminator(object):
                                             name="pool",
                                             data_format=data_format)
                     # [batch_size, num_filters*len(filter_sizes), 1, 1]
-                    pooled_outputs.append(pooled) # 900-d
+                    pooled_outputs.append(pooled)  # 900-d
                     # append all the features from each type of filters
 
             # Combine all the pooled features
             num_filters_total = num_filters * len(filter_sizes)
-            self.h_pool = tf.concat(pooled_outputs, 1) # along channel axis
+            self.h_pool = tf.concat(pooled_outputs, 1)  # along channel axis
             self.feature = tf.reshape(self.h_pool, [-1, num_filters_total])
             # squeeze all the other dimensions.. *NOTE* check later
 
@@ -96,15 +96,17 @@ class Discriminator(object):
 
             # Final (unnormalized) scores and predictions
             with tf.name_scope("output"):
-                shape = shape=[last_feature_len, num_classes]
+                shape = [last_feature_len, num_classes]
                 initializer = tf.contrib.layers.xavier_initializer()
                 W = tf.get_variable("W", shape=shape, initializer=initializer)
-                b = tf.Variable(tf.constant(0.1, shape=[num_classes]), name="b")
+                b = tf.Variable(
+                        tf.constant(0.1, shape=[num_classes]), name="b")
                 l2_loss += tf.nn.l2_loss(W)
                 l2_loss += tf.nn.l2_loss(b)
                 self.scores = tf.nn.xw_plus_b(self.h_drop, W, b, name="scores")
                 # [batch_size, 2]
-                self.predictions = tf.argmax(self.scores, 1, name="predictions")
+                self.predictions = tf.argmax(self.scores, 1,
+                                             name="predictions")
                 # No need to pass through softmax.
 
             # CalculateMean cross-entropy loss
@@ -121,7 +123,6 @@ class Discriminator(object):
                                                name="accuracy")
 
         self.vars = tf.contrib.framework.get_variables(vs)
-
 
     def run(self, sess, ops, feed_list, dropout_prob):
         """feed_list = list([quenstion, answer, label])"""

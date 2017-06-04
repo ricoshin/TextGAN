@@ -1,15 +1,11 @@
 from __future__ import print_function
 
 import numpy as np
-#from tqdm import trange
 from tqdm import tqdm
-from collections import deque
-from utils import *
 import tensorflow as tf
 from discriminator import Discriminator
 from generator import Generator
 from data import TOK_PAD, convert_to_token
-import random
 
 
 class GANTrainer(object):
@@ -23,13 +19,13 @@ class GANTrainer(object):
         self.W_e_init = np.asarray(W_e_init)
         self.word2idx = word2idx
         self.ans2idx = ans2idx
-        if ans2idx != None:
+        if ans2idx is not None:
             self.idx2ans = {v: k for k, v in ans2idx.items()}
         self.pad_idx = word2idx[TOK_PAD]
         self.max_sentence_len = np.asarray(train_data[0]).shape[1]
         self.vocab_size = self.W_e_init.shape[0]
         self.embedding_size = self.W_e_init.shape[1]
-        self.filter_sizes = [3,4,5]
+        self.filter_sizes = [3, 4, 5]
         self.global_step = tf.Variable(0, name="global_step", trainable=False)
 
         self.build_model()
@@ -40,48 +36,46 @@ class GANTrainer(object):
         pretrain_d_saver = tf.train.Saver(self.D_fake.vars)
 
         def load_pretrain(sess):
-            #import pdb; pdb.set_trace()
             pretrain_g_saver.restore(sess, self.cfg.g_path)
             print("[!] Pre-trained generator chkpt loaded : ", self.cfg.g_path)
             pretrain_d_saver.restore(sess, self.cfg.d_path)
-            print("[!] Pre-trained discriminator chkpt loaded : ", self.cfg.d_path)
+            print("[!] Pre-trained discriminator chkpt loaded : ",
+                  self.cfg.d_path)
 
         self.writer = tf.summary.FileWriter(self.cfg.model_dir)
 
-        self.sv = tf.train.Supervisor(logdir=self.cfg.model_dir,
-                                is_chief=True,
-                                saver=self.saver,
-                                summary_op=None,
-                                init_fn=load_pretrain,
-                                #summary_writer=self.summary_writer,
-                                save_model_secs=self.cfg.save_model_secs,
-                                global_step=self.global_step,
-                                ready_for_local_init_op=None)
+        self.sv = tf.train.Supervisor(
+                      logdir=self.cfg.model_dir,
+                      is_chief=True,
+                      saver=self.saver,
+                      summary_op=None,
+                      init_fn=load_pretrain,
+                      save_model_secs=self.cfg.save_model_secs,
+                      global_step=self.global_step,
+                      ready_for_local_init_op=None)
 
         gpu_options = tf.GPUOptions(allow_growth=True)
         sess_config = tf.ConfigProto(allow_soft_placement=True,
-                                    gpu_options=gpu_options)
+                                     gpu_options=gpu_options)
 
         self.sess = self.sv.prepare_or_wait_for_session(config=sess_config)
-
 
     def compute_generator_loss(self, feature_real, feature_fake):
         pass
 
     def compute_generator_loss_tmp(self, feature_real, feature_fake):
-
-        #feature_real = d_feature[0:self.cfg.batch_size]
-        #feature_fake = d_feature[self.cfg.batch_size:]
-        return tf.reduce_mean(tf.square(tf.subtract(feature_real,feature_fake)))
+        # feature_real = d_feature[0:self.cfg.batch_size]
+        # feature_fake = d_feature[self.cfg.batch_size:]
+        return tf.reduce_mean(
+                   tf.square(tf.subtract(feature_real, feature_fake)))
 
     def build_model(self):
-        #  self, W_e_init, max_sentence_len, num_classes, vocab_size,
-        #  embedding_size, filter_sizes, num_filters, data_format, l2_reg_lambda=0.0
         is_onehot = True if self.cfg.dataset == 'nugu' else False
+
         self.G = Generator(word_embd=self.W_e_init,
                            ans2idx=self.ans2idx,
                            max_ques_len=self.max_sentence_len,
-                           is_pre_train=False,
+                           teacher_forcing=False,
                            is_onehot=is_onehot,
                            z_dim=self.cfg.z_dim)
 
@@ -108,9 +102,8 @@ class GANTrainer(object):
                                     que_fake=None,
                                     reuse=True)
 
-
         self.g_loss = self.compute_generator_loss_tmp(self.D_real.feature,
-                                                      self.D_fake.feature)#D.feature)
+                                                      self.D_fake.feature)
         self.d_loss = (self.D_real.loss + self.D_fake.loss)/2
         self.d_accuracy = (self.D_real.accuracy + self.D_fake.accuracy)/2
 
@@ -124,13 +117,13 @@ class GANTrainer(object):
 
         g_optimizer = tf.train.AdamOptimizer(self.g_lr)
         d_optimizer = self.optimizer(self.d_lr)
-        #import pdb; pdb.set_trace()
+
         d_grads_vars = d_optimizer.compute_gradients(self.d_loss,
                                                      self.D_real.vars)
         g_grads_vars = g_optimizer.compute_gradients(self.g_loss, self.G.vars)
         self.d_train_op = d_optimizer.apply_gradients(d_grads_vars)
-        self.g_train_op = g_optimizer.apply_gradients(g_grads_vars,
-                                                 global_step=self.global_step)
+        self.g_train_op = g_optimizer.apply_gradients(
+                              g_grads_vars, global_step=self.global_step)
 
         # Keep track of gradient values and sparsity (optional)
         grads_vars = g_grads_vars + d_grads_vars
@@ -157,7 +150,7 @@ class GANTrainer(object):
         questions, answers, z, dropout_prob = feed_list
         batch_size = answers.shape[0]
         answers_g = np.reshape(answers, [batch_size])   # *NOTE*answer shape
-        answers_d = np.reshape(answers, [batch_size, 1])# better be unified!
+        answers_d = np.reshape(answers, [batch_size, 1])  # better be unified!
         labels_real = self.label_real
         labels_fake = self.label_fake
         feed_dict = {
@@ -175,7 +168,6 @@ class GANTrainer(object):
         }
         return sess.run(ops, feed_dict)
 
-
     def train(self):
 
         from data_loader import Dataset
@@ -188,10 +180,11 @@ class GANTrainer(object):
         self.label_fake = train_generator.get_binary_label_batch(False)
 
         dropout_prob = self.cfg.d_dropout_prob
-        pbar = tqdm(total = self.cfg.max_step)
+        pbar = tqdm(total=self.cfg.max_step)
         step = self.sess.run(self.global_step)
 
-        z_test = np.random.uniform(-1, 1,[self.cfg.batch_size, self.cfg.z_dim])
+        # z_test = np.random.uniform(-1, 1,
+        #                            [self.cfg.batch_size, self.cfg.z_dim])
 
         if step > 1:
             pbar.update(step)
@@ -211,7 +204,7 @@ class GANTrainer(object):
                 z = np.random.uniform(-1, 1,
                                       [self.cfg.batch_size, self.cfg.z_dim])
                 feed = [que_real, ans_real, z, dropout_prob]
-                ops = [self.d_loss,self.summary_op, self.d_train_op]
+                ops = [self.d_loss, self.summary_op, self.d_train_op]
                 d_loss, summary, _ = self.run_gan(self.sess, ops, feed)
 
             # summary & print message
@@ -236,7 +229,6 @@ class GANTrainer(object):
                 else:
                     raise Exception('Unsupported dataset:', self.cfg.dataset)
 
-
     def _print_simque_samples(self, feed):
         outputs = self.run_gan(self.sess, self.G.outputs, feed)
         outputs = np.argmax(outputs[:self.cfg.num_samples], axis=-1)
@@ -244,7 +236,7 @@ class GANTrainer(object):
 
         ans_real = feed[1]
         inputs = convert_to_token(ans_real[:self.cfg.num_samples],
-                                   self.word2idx)
+                                  self.word2idx)
 
         for ans, ques in zip(inputs, outputs):
             print('%20s => %s' % (ans[0], ' '.join(ques)))

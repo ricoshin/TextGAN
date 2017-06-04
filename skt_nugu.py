@@ -11,7 +11,8 @@ def load_skt_nugu(data_dir, maximum):
     def parse_file(lines, vocab):
         twitter = Twitter()
         data = dict()
-        for i, line in tqdm(enumerate(lines), desc=lines.name, mininterval=0.5):
+        for i, line in tqdm(enumerate(lines), desc=lines.name,
+                            mininterval=0.5):
             line = line.strip().split('\t')
             if len(line) is not 2:
                 continue
@@ -53,7 +54,6 @@ def load_skt_nugu_samples(data_dir):
     return questions, answers, vocab
 
 
-
 def load_category_line_nums(data_dir, categories):
     def parse_file(lines):
         line_nums = dict()
@@ -86,10 +86,11 @@ def _make_samples(data_dir, categories, num_samples):
     sampled_line_nums = list()
     num_samples = 10000
     for key, line_nums in line_nums.items():
-        sampled_line_nums.extend(np.random.permutation(line_nums)[:num_samples])
+        sampled_line_nums.extend(
+            np.random.permutation(line_nums)[:num_samples])
 
-    samples = load_question_samples(data_dir, sampled_line_nums)
-    save_samples(data_dir, samples)
+    samples = _load_question_samples(data_dir, sampled_line_nums)
+    _save_samples(data_dir, samples)
     return samples
 
 

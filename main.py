@@ -15,10 +15,12 @@ def main(config):
     """ NOTE : should fix problems when valid mode is on """
     # get trainer instance
     if config.dataset == 'nugu':
-        train, ans2idx, W_e_init, word2idx = load_skt_nugu_sample_dataset(config)
+        train, ans2idx, W_e_init, word2idx = \
+            load_skt_nugu_sample_dataset(config)
         valid = train
     elif config.dataset == 'simque':
-        train, valid, W_e_init, word2idx = load_simple_questions_dataset(config)
+        train, valid, W_e_init, word2idx = \
+            load_simple_questions_dataset(config)
         ans2idx = None
     else:
         raise Exception('Unsupported dataset:', config.dataset)
@@ -42,12 +44,6 @@ def main(config):
             trainer.test_interactive()
         else:
             trainer.test()
-
-
-def main_G(config):
-    train, ans2idx, word_embd, word2idx = load_skt_nugu_sample_dataset(config)
-    g_trainer = GTrainer(config, train, None, word_embd, word2idx, ans2idx)
-    g_trainer.train()
 
 
 if __name__ == "__main__":

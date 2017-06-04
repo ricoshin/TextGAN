@@ -3,41 +3,35 @@ import tensorflow as tf
 
 
 class Generator(object):
-    def __init__(self, word_embd, max_ques_len, ans2idx, is_pre_train,
+    def __init__(self, word_embd, max_ques_len, ans2idx, teacher_forcing,
                  is_onehot, z_dim=100, hid_dim=100):
-        self.is_pre_train = is_pre_train
+        self.teacher_forcing = teacher_forcing
         if is_onehot:
             num_classes = len(ans2idx)
         with tf.variable_scope('G') as vs:
             self.batch_size = tf.placeholder(tf.int32, [], name='batch_size')
-            word_embd = tf.Variable(word_embd, name='word_embd',
-                                    dtype=tf.float32)
+            word_embd = tf.Variable(word_embd, dtype=tf.float32,
+                                    name='word_embd')
             vocab_size, word_embd_size = word_embd.get_shape().as_list()
-            self.z = tf.placeholder(tf.float32,
-                                    shape=[None, z_dim],
+            self.z = tf.placeholder(tf.float32, shape=[None, z_dim],
                                     name='z')
-            self.answers = tf.placeholder(tf.int32,
-                                          shape=[None],
+            self.answers = tf.placeholder(tf.int32, shape=[None],
                                           name='answers')
-            self.targets = tf.placeholder(tf.int32,
-                                          shape=[None, max_ques_len],
+            self.targets = tf.placeholder(tf.int32, shape=[None, max_ques_len],
                                           name='targets')
             V = tf.Variable(tf.random_normal([hid_dim, vocab_size]), name='V')
 
             if is_onehot:
                 C = tf.Variable(tf.random_normal([z_dim+num_classes, hid_dim]),
                                 name='C')
-            else:
-                C = tf.Variable(tf.random_normal([z_dim+word_embd_size,
-                                                  hid_dim]),
-                                name='C')
-
-            if is_onehot:
                 # [batch_size, num_classes]
                 ans_onehot = tf.one_hot(self.answers, num_classes, axis=-1)
                 # [batch_size, z_dim + num_classes]
                 za = tf.concat([self.z, ans_onehot], axis=1, name='za')
             else:
+                C = tf.Variable(tf.random_normal([z_dim+word_embd_size,
+                                                  hid_dim]),
+                                name='C')
                 # [batch_size, word_embd_size]
                 ans_embd = tf.nn.embedding_lookup(word_embd, self.answers,
                                                   name='ans_embd')
@@ -55,8 +49,7 @@ class Generator(object):
             self.outputs = [w_1]
 
             # [batch_size, word_embd_size]
-            # y_1 = tf.nn.embedding_lookup(word_embd, w_1)
-            y_1 = tf.matmul(w_1, word_embd)
+            y_1 = tf.nn.embedding_lookup(word_embd, tf.argmax(hV_1, axis=1))
 
             cell = tf.contrib.rnn.LSTMCell(hid_dim)
 
@@ -64,7 +57,7 @@ class Generator(object):
             state = tf.contrib.rnn.LSTMStateTuple(state.c, h_1)
 
             pre_train_losses = []
-            if self.is_pre_train:
+            if self.teacher_forcing:
                 inputs = tf.nn.embedding_lookup(word_embd, self.targets[:, 0])
                 # inputs = tf.stop_gradient(inputs)
             else:
@@ -81,10 +74,9 @@ class Generator(object):
                 # w_t = tf.argmax(hV, axis=1)
                 w_t = tf.nn.softmax(hV*10000)
                 self.outputs.append(w_t)
-                # y_t = tf.nn.embedding_lookup(word_embd, w_t)
-                y_t = tf.matmul(w_t, word_embd)
+                y_t = tf.nn.embedding_lookup(word_embd, tf.argmax(hV, axis=1))
 
-                if self.is_pre_train:
+                if self.teacher_forcing:
                     inputs = tf.nn.embedding_lookup(word_embd,
                                                     self.targets[:, t])
                 else:
@@ -101,7 +93,7 @@ class Generator(object):
         self.vars = tf.contrib.framework.get_variables(vs)
 
     def run(self, sess, train_op, z, answers, targets=None):
-        if self.is_pre_train and targets is None:
+        if self.teacher_forcing and targets is None:
             raise Exception('targets needed when pre-training')
         batch_size = answers.shape[0]
         feed_dict = {

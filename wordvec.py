@@ -5,6 +5,14 @@ from tqdm import tqdm
 
 
 def _load_vocab(fname):
+    """Load vocabulary from `fname`
+    `fname` must be in format as:
+    word\tfloat_1 float_2 float_3 ... float_n
+    Args:
+        fname: path to a word vectors file
+    Returns:
+        a set of words
+    """
     with open(fname) as lines:
         vocab = set(line.split()[0] for line in tqdm(lines,
                                                      desc=lines.name,
@@ -13,6 +21,14 @@ def _load_vocab(fname):
 
 
 def _load_embeddings(fname, size, vocab, delimiter=' '):
+    """Load word vectors corresponding to words in `vocab` from `fname`
+    `fname` must be in format as:
+    word\tfloat_1 float_2 float_3 ... float_n
+    Args:
+        fname: path to a word vectors file
+        size: word vector dimension
+        vocab: a set of words to get word vectors
+    """
     word2embd = dict()
 
     with open(fname) as lines:

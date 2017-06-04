@@ -19,7 +19,7 @@ class GTrainer(object):
         self.config = config
         is_onehot = True if config.dataset == 'nugu' else False
         self.generator = Generator(word_embd, self.max_sent_len, ans2idx,
-                                   is_pre_train=False,
+                                   teacher_forcing=False,
                                    is_onehot=is_onehot,
                                    z_dim=self.config.z_dim)
 
@@ -44,10 +44,10 @@ class GTrainer(object):
         sv = tf.train.Supervisor(logdir=self.config.model_dir,
                                  save_model_secs=self.config.save_model_secs)
         with sv.managed_session() as sess:
-            for i, batch in enumerate(
-                             self.random_batch_generator(self.train_data,
-                                                         self.config.batch_size,
-                                                         self.config.max_step)):
+            for i, batch in enumerate(self.random_batch_generator(
+                                          self.train_data,
+                                          self.config.batch_size,
+                                          self.config.max_step)):
                 if sv.should_stop():
                     break
                 questions, answers, z = batch

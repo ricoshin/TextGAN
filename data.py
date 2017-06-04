@@ -100,7 +100,8 @@ def remove_unknown_answers(data, vocab):
 
 def load_skt_nugu_sample_dataset(config):
     data_npz = os.path.join(config.data_dir, 'data_skt_nugu_sample.npz')
-    word2idx_txt = os.path.join(config.data_dir, 'word2idx_skt_nugu_sample.txt')
+    word2idx_txt = os.path.join(config.data_dir,
+                                'word2idx_skt_nugu_sample.txt')
     ans2idx_txt = os.path.join(config.data_dir, 'ans2idx_skt_nugu_sample.txt')
 
     if (os.path.exists(data_npz) and os.path.exists(word2idx_txt) and
@@ -125,8 +126,6 @@ def load_skt_nugu_sample_dataset(config):
 
     path = os.path.join(config.data_dir, 'skt-nugu')
     ques, ans, nugu_vocab = load_skt_nugu_samples(path)
-
-    import ipdb; ipdb.set_trace()
 
     unknown_vocab = nugu_vocab-fast_vocab
     ques = replace_unknowns(ques, unknown_vocab)
