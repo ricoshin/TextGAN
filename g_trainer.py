@@ -41,9 +41,12 @@ class GTrainer(object):
         opt = tf.train.AdamOptimizer(self.config.g_lr)
         train_op = opt.minimize(self.generator.pre_train_loss)
 
+        gpu_options = tf.GPUOptions(allow_growth=True)
+        sess_config = tf.ConfigProto(allow_soft_placement=True,
+                                     gpu_options=gpu_options)
         sv = tf.train.Supervisor(logdir=self.config.model_dir,
                                  save_model_secs=self.config.save_model_secs)
-        with sv.managed_session() as sess:
+        with sv.managed_session(config=sess_config) as sess:
             for i, batch in enumerate(self.random_batch_generator(
                                           self.train_data,
                                           self.config.batch_size,
