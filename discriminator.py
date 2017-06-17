@@ -20,7 +20,9 @@ class Discriminator(object):
             self.answers = tf.placeholder(tf.int32, [None, 1],
                                           name="ans")
             self.dropout_prob = tf.placeholder(tf.float32, name="dropout_prob")
-            self.W_e = tf.Variable(word_embd, name="W_e", dtype=tf.float32)
+            self.W_e = tf.get_variable(
+                "W_e", shape=word_embd.shape,
+                initializer=tf.constant_initializer(word_embd))
             self.is_pre_train = tf.placeholder(tf.bool, name="is_pre_train")
             # Keeping track of l2 regularization loss (optional)
             l2_loss = tf.constant(0.0)
@@ -43,16 +45,19 @@ class Discriminator(object):
             # Create a convolution + maxpool layer for each filter size
             pooled_outputs = []
             for i, filter_size in enumerate(filter_sizes):
-                with tf.name_scope("conv-maxpool-%s" % filter_size):
+                with tf.variable_scope("conv-maxpool-%s" % filter_size):
                     # Convolution Layer
                     filter_shape = [filter_size, embedding_size, 1,
                                     num_filters]
-                    W = tf.Variable(tf.truncated_normal(
-                                    filter_shape, stddev=0.1), name="W")
+                    W = tf.get_variable(
+                        "W", shape=filter_shape,
+                        initializer=tf.truncated_normal_initializer(
+                            stddev=0.1))
                     # magnitude is more than 2 standard deviations
                     #   from the mean are dropped and re-picked.
-                    b = tf.Variable(tf.constant(0.1, shape=[num_filters]),
-                                    name="b")
+                    b = tf.get_variable(
+                        "b", shape=[num_filters],
+                        initializer=tf.constant_initializer(0.1))
                     conv = tf.nn.conv2d(self.embed_expanded, W,
                                         strides=[1, 1, 1, 1],
                                         padding="VALID",
@@ -97,10 +102,11 @@ class Discriminator(object):
             # Final (unnormalized) scores and predictions
             with tf.name_scope("output"):
                 shape = [last_feature_len, num_classes]
-                initializer = tf.contrib.layers.xavier_initializer()
-                W = tf.get_variable("W", shape=shape, initializer=initializer)
-                b = tf.Variable(
-                        tf.constant(0.1, shape=[num_classes]), name="b")
+                W = tf.get_variable(
+                    "W", shape=shape,
+                    initializer=tf.contrib.layers.xavier_initializer())
+                b = tf.get_variable("b", shape=[num_classes],
+                                    initializer=tf.constant_initializer(0.1))
                 l2_loss += tf.nn.l2_loss(W)
                 l2_loss += tf.nn.l2_loss(b)
                 self.scores = tf.nn.xw_plus_b(self.h_drop, W, b, name="scores")

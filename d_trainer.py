@@ -107,7 +107,7 @@ class DTrainer(object):
             if not step % self.cfg.log_step == 0:
                 continue
 
-            ops = [self.train_summary_op, self.D.loss, self.D.accuracy]
+            ops = [self.D.loss, self.D.accuracy]
             train_loss, train_acc = self.D.run(self.sess, ops, feed,
                                                dropout_prob)
             print_msg = '[{}/{}] D_loss: {:.6f} D_accuracy: {:.6f}'.format(
